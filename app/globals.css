@@ -26,6 +26,16 @@ body {
   color: var(--text);
 }
 
+/* 旋转动画 */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .container {
   max-width: 1120px;
   margin: 0 auto;

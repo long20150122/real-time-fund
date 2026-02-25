@@ -8,8 +8,9 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import Announcement from "./components/Announcement";
-import { DatePicker, DonateTabs, NumericInput, Stat } from "./components/Common";
+import { DatePicker, NumericInput, Stat } from "./components/Common";
 import { ChevronIcon, CloseIcon, CloudIcon, DragIcon, ExitIcon, EyeIcon, EyeOffIcon, GridIcon, ListIcon, LoginIcon, LogoutIcon, MailIcon, PinIcon, PinOffIcon, PlusIcon, RefreshIcon, SettingsIcon, SortIcon, StarIcon, TrashIcon, UpdateIcon, UserIcon } from "./components/Icons";
+import StockKlineModal from "./components/StockKlineChart";
 import githubImg from "./assets/github.svg";
 import weChatGroupImg from "./assets/weChatGroup.png";
 import { supabase, isSupabaseConfigured } from './lib/supabase';
@@ -202,6 +203,307 @@ function WeChatModal({ onClose }) {
         <p className="muted" style={{ textAlign: 'center', marginTop: 16, fontSize: '14px' }}>
             扫码加入群聊，获取最新更新与交流
         </p>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// 历史持仓弹窗组件
+function HistoryHoldingsModal({ fund, loading, data, onClose, onStockClick }) {
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    const quarter = Math.ceil((date.getMonth() + 1) / 3);
+    return `${date.getFullYear()}年第${quarter}季度`;
+  };
+
+  const getChangeRateColor = (rate) => {
+    const num = parseFloat(rate);
+    if (num > 30) return 'var(--danger)';
+    if (num > 15) return 'var(--accent)';
+    if (num > 0) return 'var(--primary)';
+    return 'var(--success)';
+  };
+
+  return (
+    <motion.div
+      className="modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="历史持仓"
+      onClick={onClose}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="glass card modal"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: '600px', maxHeight: '80vh', overflow: 'auto' }}
+      >
+        <div className="title" style={{ marginBottom: 20, justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <UpdateIcon width="20" height="20" />
+            <span>历史持仓</span>
+          </div>
+          <button className="icon-button" onClick={onClose} style={{ border: 'none', background: 'transparent' }}>
+            <CloseIcon width="20" height="20" />
+          </button>
+        </div>
+
+        <div style={{ marginBottom: 20, textAlign: 'center' }}>
+          <div className="fund-name" style={{ fontWeight: 600, fontSize: '16px', marginBottom: 4 }}>{fund?.name}</div>
+          <div className="muted" style={{ fontSize: '12px' }}>#{fund?.code}</div>
+        </div>
+
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '40px 0' }}>
+            <div className="loading-spinner" style={{ 
+              width: '40px', 
+              height: '40px', 
+              border: '3px solid rgba(255,255,255,0.1)', 
+              borderTop: '3px solid var(--primary)',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite',
+              margin: '0 auto 16px'
+            }} />
+            <p className="muted">正在加载历史持仓...</p>
+          </div>
+        ) : data?.error ? (
+          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--danger)' }}>
+            <p>{data.error}</p>
+          </div>
+        ) : !data?.periods || data.periods.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px 0' }}>
+            <p className="muted">暂无历史持仓数据</p>
+            <p style={{ fontSize: '12px', marginTop: 8 }}>请先运行爬虫脚本获取数据</p>
+            <code style={{ 
+              display: 'block', 
+              marginTop: 16, 
+              padding: '12px', 
+              background: 'rgba(0,0,0,0.3)',
+              borderRadius: '8px',
+              fontSize: '12px',
+              fontFamily: 'monospace'
+            }}>
+              node crawler/stockSpider.js {fund?.code}
+            </code>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {data.periods.map((period, index) => (
+              <div key={period.report_date} className="history-period" style={{
+                border: '1px solid var(--border)',
+                borderRadius: '12px',
+                padding: '16px',
+                background: 'rgba(255,255,255,0.02)'
+              }}>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  marginBottom: 12,
+                  paddingBottom: 12,
+                  borderBottom: '1px solid rgba(255,255,255,0.05)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontWeight: 600 }}>{formatDate(period.report_date)}</span>
+                    <span className="muted" style={{ fontSize: '12px' }}>
+                      ({period.stocks.length}只)
+                    </span>
+                  </div>
+                  {index < data.periods.length - 1 && (
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 8,
+                      fontSize: '12px'
+                    }}>
+                      <span className="muted">相对上期变化:</span>
+                      <span style={{ 
+                        color: getChangeRateColor(period.changeRate),
+                        fontWeight: 600
+                      }}>
+                        {period.changeRate}%
+                      </span>
+                      {period.addedCount > 0 && (
+                        <span style={{ color: 'var(--success)', fontSize: '11px' }}>
+                          +{period.addedCount}
+                        </span>
+                      )}
+                      {period.removedCount > 0 && (
+                        <span style={{ color: 'var(--danger)', fontSize: '11px' }}>
+                          -{period.removedCount}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {period.stocks.map((stock, idx) => (
+                    <div 
+                      key={stock.stock_code || idx} 
+                      onClick={() => onStockClick?.({ code: stock.stock_code, name: stock.stock_name })}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '6px 8px',
+                        borderBottom: idx < period.stocks.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none',
+                        cursor: 'pointer',
+                        borderRadius: 6,
+                        transition: 'background 0.2s',
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(34, 211, 238, 0.08)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span className="muted" style={{ fontSize: '12px', minWidth: '20px' }}>{idx + 1}</span>
+                        <span style={{ fontSize: '14px' }}>{stock.stock_name}</span>
+                        <span className="muted" style={{ fontSize: '11px', fontFamily: 'monospace' }}>
+                          {stock.stock_code}
+                        </span>
+                        {stock.status === 'new' && (
+                          <span style={{ 
+                            fontSize: '10px', 
+                            color: 'var(--success)', 
+                            background: 'rgba(34, 197, 94, 0.15)',
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            fontWeight: 500
+                          }}>
+                            调入
+                          </span>
+                        )}
+                        <span style={{ 
+                          fontSize: '10px', 
+                          color: 'var(--primary)', 
+                          opacity: 0.6,
+                        }}>
+                          📈
+                        </span>
+                      </div>
+                      <span style={{ 
+                        fontSize: '13px', 
+                        color: 'var(--accent)',
+                        fontWeight: 500
+                      }}>
+                        {stock.weight}
+                      </span>
+                    </div>
+                  ))}
+                  {/* 显示调出的股票 */}
+                  {period.removedStocks && period.removedStocks.length > 0 && (
+                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
+                      <div className="muted" style={{ fontSize: '12px', marginBottom: 8 }}>调出股票:</div>
+                      {period.removedStocks.map((stock, idx) => (
+                        <div key={`removed-${stock.stock_code || idx}`} style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '4px 0',
+                          opacity: 0.6
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: '13px', textDecoration: 'line-through' }}>{stock.stock_name}</span>
+                            <span className="muted" style={{ fontSize: '11px', fontFamily: 'monospace' }}>
+                              {stock.stock_code}
+                            </span>
+                            <span style={{ 
+                              fontSize: '10px', 
+                              color: 'var(--danger)', 
+                              background: 'rgba(239, 68, 68, 0.15)',
+                              padding: '1px 6px',
+                              borderRadius: '4px',
+                              fontWeight: 500
+                            }}>
+                              调出
+                            </span>
+                          </div>
+                          <span className="muted" style={{ fontSize: '12px' }}>
+                            {stock.weight}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// 爬虫提示弹框组件
+function CrawlAlertModal({ fund, onClose }) {
+  return (
+    <motion.div
+      className="modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="数据抓取提示"
+      onClick={onClose}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="glass card modal"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: '400px', textAlign: 'center' }}
+      >
+        <div style={{ padding: '20px 0' }}>
+          <div style={{ 
+            width: '60px', 
+            height: '60px', 
+            borderRadius: '50%', 
+            background: 'linear-gradient(135deg, var(--primary), var(--accent))',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 20px'
+          }}>
+            <UpdateIcon width="28" height="28" />
+          </div>
+          
+          <h3 style={{ marginBottom: 12, fontSize: '18px' }}>数据抓取中</h3>
+          
+          <p style={{ color: 'var(--text-secondary)', marginBottom: 8, lineHeight: 1.6 }}>
+            数据库暂无 <strong>{fund?.name}</strong> 的历史持仓数据
+          </p>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: 16, lineHeight: 1.6 }}>
+            正在执行数据抓取，请 <strong style={{ color: 'var(--accent)' }}>1分钟后再查看历史持仓</strong>
+          </p>
+          
+          <div style={{ 
+            background: 'rgba(255,255,255,0.05)', 
+            borderRadius: '8px', 
+            padding: '12px',
+            marginBottom: 20,
+            fontSize: '12px'
+          }}>
+            <p className="muted" style={{ marginBottom: 4 }}>抓取内容</p>
+            <p style={{ color: 'var(--text-secondary)' }}>最近3年（12个季度）的前十大持仓数据</p>
+          </div>
+          
+          <button 
+            className="primary-button" 
+            onClick={onClose}
+            style={{ minWidth: '120px' }}
+          >
+            我知道了
+          </button>
+        </div>
       </motion.div>
     </motion.div>
   );
@@ -1879,6 +2181,28 @@ function GroupSummary({ funds, holdings, groupName, getProfit }) {
 }
 
 export default function HomePage() {
+  // 登录检查
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [user, setUser] = useState(null);
+  
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const currentUserStr = localStorage.getItem('currentUser');
+    if (!currentUserStr) {
+      window.location.href = '/login';
+      return;
+    }
+    
+    try {
+      const currentUser = JSON.parse(currentUserStr);
+      setUser(currentUser);
+      setCheckingAuth(false);
+    } catch (e) {
+      window.location.href = '/login';
+    }
+  }, []);
+
   const [funds, setFunds] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -1913,8 +2237,7 @@ export default function HomePage() {
   // 视图模式
   const [viewMode, setViewMode] = useState('card'); // card, list
 
-  // 用户认证状态
-  const [user, setUser] = useState(null);
+  // 用户菜单状态
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [loginEmail, setLoginEmail] = useState('');
@@ -1947,10 +2270,12 @@ export default function HomePage() {
   const [addResultOpen, setAddResultOpen] = useState(false);
   const [addFailures, setAddFailures] = useState([]);
   const [holdingModal, setHoldingModal] = useState({ open: false, fund: null });
+  const [historyModal, setHistoryModal] = useState({ open: false, fund: null, loading: false, data: null });
+  const [crawlAlert, setCrawlAlert] = useState({ open: false, fund: null }); // 爬虫提示弹框
   const [actionModal, setActionModal] = useState({ open: false, fund: null });
   const [tradeModal, setTradeModal] = useState({ open: false, fund: null, type: 'buy' }); // type: 'buy' | 'sell'
+  const [stockKlineModal, setStockKlineModal] = useState({ open: false, stock: null }); // 股票K线图弹框
   const [clearConfirm, setClearConfirm] = useState(null); // { fund }
-  const [donateOpen, setDonateOpen] = useState(false);
   const [holdings, setHoldings] = useState({}); // { [code]: { share: number, cost: number } }
   const [pendingTrades, setPendingTrades] = useState([]); // [{ id, fundCode, share, date, ... }]
   const [percentModes, setPercentModes] = useState({}); // { [code]: boolean }
@@ -2379,11 +2704,7 @@ export default function HomePage() {
 
   const handleOpenLogin = () => {
     setUserMenuOpen(false);
-    if (!isSupabaseConfigured) {
-      showToast('未配置 Supabase，无法登录', 'error');
-      return;
-    }
-    setLoginModalOpen(true);
+    window.location.href = '/login';
   };
 
   const [updateModalOpen, setUpdateModalOpen] = useState(false);
@@ -2506,6 +2827,34 @@ export default function HomePage() {
     });
   };
 
+  const openHistoryModal = async (fund) => {
+    setHistoryModal({ open: true, fund, loading: true, data: null });
+    try {
+      const res = await fetch(`/api/stocks?fundCode=${fund.code}`);
+      const data = await res.json();
+      
+      // 检查是否有数据
+      if (!data.periods || data.periods.length === 0 || data.totalPeriods === 0) {
+        // 没有数据，关闭弹框，显示提示并启动爬虫
+        setHistoryModal({ open: false, fund: null, loading: false, data: null });
+        setCrawlAlert({ open: true, fund });
+        
+        // 后台执行爬虫
+        fetch('/api/crawl', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fundCode: fund.code })
+        }).catch(err => console.error('爬虫执行失败:', err));
+        
+        return;
+      }
+      
+      setHistoryModal(prev => ({ ...prev, loading: false, data }));
+    } catch (err) {
+      setHistoryModal(prev => ({ ...prev, loading: false, error: '加载失败' }));
+    }
+  };
+
   const toggleCollapse = (code) => {
     setCollapsedCodes(prev => {
       const next = new Set(prev);
@@ -2543,7 +2892,7 @@ export default function HomePage() {
   const handleUpdateGroups = (newGroups) => {
     setGroups(newGroups);
     storageHelper.setItem('groups', JSON.stringify(newGroups));
-    // 如果当前选中的分组被删除了，切换回“全部”
+    // 如果当前选中的分组被删除了，切换回"全部"
     if (currentTab !== 'all' && currentTab !== 'fav' && !newGroups.find(g => g.id === currentTab)) {
       setCurrentTab('all');
     }
@@ -2653,11 +3002,10 @@ export default function HomePage() {
     } catch { }
   }, []);
 
-  // 初始化认证状态监听
+  // 初始化认证状态监听 (仅 Supabase 模式)
   useEffect(() => {
     if (!isSupabaseConfigured) {
-      setUser(null);
-      setUserMenuOpen(false);
+      // CSV 模式下不做任何处理，user 状态由登录检查 useEffect 管理
       return;
     }
     const clearAuthState = () => {
@@ -2826,55 +3174,9 @@ export default function HomePage() {
   // 登出
   const handleLogout = async () => {
     isLoggingOutRef.current = true;
-    if (!isSupabaseConfigured) {
-      setLoginModalOpen(false);
-      setLoginError('');
-      setLoginSuccess('');
-      setLoginEmail('');
-      setLoginOtp('');
-      setUserMenuOpen(false);
-      setUser(null);
-      return;
-    }
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        const { error } = await supabase.auth.signOut({ scope: 'local' });
-        if (error && error.code !== 'session_not_found') {
-          throw error;
-        }
-      }
-    } catch (err) {
-      showToast(err.message, 'error')
-      console.error('登出失败', err);
-    } finally {
-      try {
-        await supabase.auth.signOut({ scope: 'local' });
-      } catch { }
-      try {
-        const storageKeys = Object.keys(localStorage);
-        storageKeys.forEach((key) => {
-          if (key === 'supabase.auth.token' || (key.startsWith('sb-') && key.endsWith('-auth-token'))) {
-            storageHelper.removeItem(key);
-          }
-        });
-      } catch { }
-      try {
-        const sessionKeys = Object.keys(sessionStorage);
-        sessionKeys.forEach((key) => {
-          if (key === 'supabase.auth.token' || (key.startsWith('sb-') && key.endsWith('-auth-token'))) {
-            sessionStorage.removeItem(key);
-          }
-        });
-      } catch { }
-      setLoginModalOpen(false);
-      setLoginError('');
-      setLoginSuccess('');
-      setLoginEmail('');
-      setLoginOtp('');
-      setUserMenuOpen(false);
-      setUser(null);
-    }
+    // CSV 存储模式：清除本地用户数据并跳转到登录页
+    localStorage.removeItem('currentUser');
+    window.location.href = '/login';
   };
 
   // 关闭用户菜单（点击外部时）
@@ -3071,6 +3373,13 @@ export default function HomePage() {
         const next = dedupeByCode([...newFunds, ...funds]);
         setFunds(next);
         storageHelper.setItem('funds', JSON.stringify(next));
+        
+        // 同步到 CSV 文件（全量覆盖）
+        fetch('/api/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ funds: next, mode: 'replace' })
+        }).catch(() => {});
       }
       setSearchTerm('');
       setSelectedFunds([]);
@@ -3133,6 +3442,14 @@ export default function HomePage() {
       storageHelper.setItem('pendingTrades', JSON.stringify(next));
       return next;
     });
+
+    // 同步到 CSV 文件（全量覆盖，删除后的列表）
+    const nextFunds = funds.filter((f) => f.code !== removeCode);
+    fetch('/api/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ funds: nextFunds, mode: 'replace' })
+    }).catch(() => {});
   };
 
   const manualRefresh = async () => {
@@ -3623,6 +3940,15 @@ export default function HomePage() {
         setSuccessModal({ open: true, message: '导入成功' });
         setSettingsOpen(false); // 导入成功自动关闭设置弹框
         if (importFileRef.current) importFileRef.current.value = '';
+        
+        // 同步到 CSV 文件（全量覆盖）
+        if (mergedFunds.length > 0) {
+          fetch('/api/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ funds: mergedFunds, mode: 'replace' })
+          }).catch(() => {});
+        }
       }
     } catch (err) {
       console.error('Import error:', err);
@@ -3644,10 +3970,11 @@ export default function HomePage() {
       cloudConfigModal.open ||
       logoutConfirmOpen ||
       holdingModal.open ||
+      historyModal.open ||
+      stockKlineModal.open ||
       actionModal.open ||
       tradeModal.open ||
       !!clearConfirm ||
-      donateOpen ||
       !!fundDeleteConfirm ||
       updateModalOpen ||
       weChatOpen;
@@ -3672,10 +3999,10 @@ export default function HomePage() {
     cloudConfigModal.open,
     logoutConfirmOpen,
     holdingModal.open,
+    historyModal.open,
     actionModal.open,
     tradeModal.open,
     clearConfirm,
-    donateOpen,
     updateModalOpen,
     weChatOpen
   ]);
@@ -3694,6 +4021,23 @@ export default function HomePage() {
     const group = groups.find(g => g.id === currentTab);
     return group ? `${group.name}资产` : '分组资产';
   };
+
+  // 检查登录状态
+  if (checkingAuth) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        color: 'white',
+        fontSize: '20px'
+      }}>
+        加载中...
+      </div>
+    );
+  }
 
   return (
     <div className="container content">
@@ -4250,9 +4594,9 @@ export default function HomePage() {
                               // 这里我们希望：点击任何地方都收起。
                               // 如果点击的是当前行，且不是拖拽操作，上面的全局 listener 会处理收起。
                               // 但为了防止点击行内容触发收起后又立即触发行的其他点击逻辑（如果有的话），
-                              // 可以在这里处理。不过当前需求是“点击其他区域收起”，
-                              // 实际上全局 listener 已经覆盖了“点击任何区域（包括其他行）收起”。
-                              // 唯一的问题是：点击当前行的“删除按钮”时，会先触发全局 click 导致收起，然后触发删除吗？
+                              // 可以在这里处理。不过当前需求是"点击其他区域收起"，
+                              // 实际上全局 listener 已经覆盖了"点击任何区域（包括其他行）收起"。
+                              // 唯一的问题是：点击当前行的"删除按钮"时，会先触发全局 click 导致收起，然后触发删除吗？
                               // 删除按钮在底层，通常不会受影响，因为 React 事件和原生事件的顺序。
                               // 但为了保险，删除按钮的 onClick 应该阻止冒泡。
 
@@ -4632,6 +4976,25 @@ export default function HomePage() {
                                           transition: 'transform 0.2s ease'
                                         }}
                                       />
+                                      <button
+                                        className="link-button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          openHistoryModal(f);
+                                        }}
+                                        style={{ 
+                                          background: 'none', 
+                                          border: 'none', 
+                                          color: 'var(--primary)', 
+                                          cursor: 'pointer',
+                                          fontSize: '12px',
+                                          marginLeft: 8,
+                                          textDecoration: 'underline'
+                                        }}
+                                        title="查看历史持仓"
+                                      >
+                                        历史持仓
+                                      </button>
                                     </div>
                                     <span className="muted">涨跌幅 / 占比</span>
                                   </div>
@@ -4648,8 +5011,18 @@ export default function HomePage() {
                                       {Array.isArray(f.holdings) && f.holdings.length ? (
                                         <div className="list">
                                           {f.holdings.map((h, idx) => (
-                                            <div className="item" key={idx}>
-                                              <span className="name">{h.name}</span>
+                                            <div 
+                                              className="item" 
+                                              key={idx}
+                                              onClick={() => h.code && setStockKlineModal({ open: true, stock: { code: h.code, name: h.name } })}
+                                              style={{ cursor: h.code ? 'pointer' : 'default' }}
+                                              onMouseEnter={(e) => h.code && (e.currentTarget.style.background = 'rgba(34, 211, 238, 0.08)')}
+                                              onMouseLeave={(e) => e.currentTarget.style.background = ''}
+                                            >
+                                              <span className="name">
+                                                {h.name}
+                                                {h.code && <span style={{ fontSize: '10px', color: 'var(--primary)', opacity: 0.6, marginLeft: 6 }}>📈</span>}
+                                              </span>
                                               <div className="values">
                                                 {typeof h.change === 'number' && (
                                                   <span className={`badge ${h.change > 0 ? 'up' : h.change < 0 ? 'down' : ''}`} style={{ marginRight: 8 }}>
@@ -4728,33 +5101,6 @@ export default function HomePage() {
               点此提交反馈
             </button>
           </p>
-          <button
-            onClick={() => setDonateOpen(true)}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--muted)',
-              fontSize: '12px',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              padding: '4px 8px',
-              borderRadius: '6px',
-              transition: 'all 0.2s ease'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = 'var(--primary)';
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = 'var(--muted)';
-              e.currentTarget.style.background = 'transparent';
-            }}
-          >
-            <span>☕</span>
-            <span>点此请作者喝杯咖啡</span>
-          </button>
         </div>
       </div>
 
@@ -4828,7 +5174,7 @@ export default function HomePage() {
         {clearConfirm && (
           <ConfirmModal
             title="清空持仓"
-            message={`确定要清空“${clearConfirm.fund?.name}”的所有持仓记录吗？此操作不可恢复。`}
+            message={`确定要清空"${clearConfirm.fund?.name}"的所有持仓记录吗？此操作不可恢复。`}
             onConfirm={handleClearConfirm}
             onCancel={() => setClearConfirm(null)}
             confirmText="确认清空"
@@ -4848,34 +5194,32 @@ export default function HomePage() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {donateOpen && (
-          <div className="modal-overlay" onClick={() => setDonateOpen(false)}>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="glass card modal"
-              style={{ maxWidth: '360px' }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="title" style={{ marginBottom: 20, justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span>☕ 请作者喝杯咖啡</span>
-                </div>
-                <button className="icon-button" onClick={() => setDonateOpen(false)} style={{ border: 'none', background: 'transparent' }}>
-                  <CloseIcon width="20" height="20" />
-                </button>
-              </div>
+        {historyModal.open && (
+          <HistoryHoldingsModal
+            fund={historyModal.fund}
+            loading={historyModal.loading}
+            data={historyModal.data}
+            onClose={() => setHistoryModal({ open: false, fund: null, loading: false, data: null })}
+            onStockClick={(stock) => setStockKlineModal({ open: true, stock })}
+          />
+        )}
+      </AnimatePresence>
 
-              <div style={{ marginBottom: 20 }}>
-                <DonateTabs />
-              </div>
+      <AnimatePresence>
+        {stockKlineModal.open && (
+          <StockKlineModal
+            stock={stockKlineModal.stock}
+            onClose={() => setStockKlineModal({ open: false, stock: null })}
+          />
+        )}
+      </AnimatePresence>
 
-              <div className="muted" style={{ fontSize: '12px', textAlign: 'center', lineHeight: 1.5 }}>
-                感谢您的支持！您的鼓励是我持续维护和更新的动力。
-              </div>
-            </motion.div>
-          </div>
+      <AnimatePresence>
+        {crawlAlert.open && (
+          <CrawlAlertModal
+            fund={crawlAlert.fund}
+            onClose={() => setCrawlAlert({ open: false, fund: null })}
+          />
         )}
       </AnimatePresence>
 

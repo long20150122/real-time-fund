@@ -20,7 +20,7 @@ export const CSV_FILES = {
 
 // CSV 表头定义
 const HEADERS = {
-  users: 'id,email,name,created_at,updated_at',
+  users: 'id,username,password,email,name,created_at,updated_at',
   funds: 'id,user_id,code,name,group_id,created_at',
   favorites: 'id,user_id,code,created_at',
   configs: 'id,user_id,data,updated_at',
@@ -83,8 +83,12 @@ export const toCSVLine = (obj, headers) => {
 export const readAll = (type) => {
   initCSVFiles();
   const filePath = CSV_FILES[type];
-  const content = fs.readFileSync(filePath, 'utf-8');
-  const lines = content.trim().split('\n');
+  let content = fs.readFileSync(filePath, 'utf-8');
+  // 移除 UTF-8 BOM 标记（如果存在）
+  if (content.charCodeAt(0) === 0xFEFF) {
+    content = content.slice(1);
+  }
+  const lines = content.trim().split(/\r?\n/);
   if (lines.length <= 1) return [];
 
   const headers = lines[0].split(',');
