@@ -83,6 +83,9 @@ export async function GET(request) {
         low: parseFloat(d.low),
         close: parseFloat(d.close),
         volume: parseInt(d.volume, 10) || 0,
+        amount: parseInt(d.amount, 10) || 0,
+        float_cap: parseInt(d.float_cap, 10) || 0,
+        turnover_rate: parseFloat(d.turnover_rate) || 0,
       }))
       .sort((a, b) => a.time.localeCompare(b.time)); // 按日期升序
     

@@ -9,7 +9,7 @@ import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import Announcement from "./components/Announcement";
 import { DatePicker, NumericInput, Stat } from "./components/Common";
-import { ChevronIcon, CloseIcon, CloudIcon, DragIcon, ExitIcon, EyeIcon, EyeOffIcon, GridIcon, ListIcon, LoginIcon, LogoutIcon, MailIcon, PinIcon, PinOffIcon, PlusIcon, RefreshIcon, SettingsIcon, SortIcon, StarIcon, TrashIcon, UpdateIcon, UserIcon } from "./components/Icons";
+import { ChevronIcon, CloseIcon, CloudIcon, DatabaseIcon, DragIcon, ExitIcon, EyeIcon, EyeOffIcon, GridIcon, ListIcon, LoginIcon, LogoutIcon, MailIcon, PinIcon, PinOffIcon, PlusIcon, RefreshIcon, SettingsIcon, SortIcon, StarIcon, TrashIcon, UpdateIcon, UserIcon } from "./components/Icons";
 import StockKlineModal from "./components/StockKlineChart";
 import githubImg from "./assets/github.svg";
 import weChatGroupImg from "./assets/weChatGroup.png";
@@ -1657,6 +1657,138 @@ function ConfirmModal({ title, message, onConfirm, onCancel, confirmText = "确�
   );
 }
 
+// 数据更新弹框组件
+function DataUpdateModal({ onClose }) {
+  const [dailyStockLoading, setDailyStockLoading] = useState(false);
+  const [financeLoading, setFinanceLoading] = useState(false);
+  const [dailyStockResult, setDailyStockResult] = useState(null);
+  const [financeResult, setFinanceResult] = useState(null);
+
+  const handleUpdateDailyStock = async () => {
+    setDailyStockLoading(true);
+    setDailyStockResult(null);
+    try {
+      const res = await fetch('/api/crawl/daily-stock', { method: 'POST' });
+      const data = await res.json();
+      setDailyStockResult(data);
+    } catch (e) {
+      setDailyStockResult({ success: false, error: e.message });
+    } finally {
+      setDailyStockLoading(false);
+    }
+  };
+
+  const handleUpdateFinance = async () => {
+    setFinanceLoading(true);
+    setFinanceResult(null);
+    try {
+      const res = await fetch('/api/crawl/quarter-finance', { method: 'POST' });
+      const data = await res.json();
+      setFinanceResult(data);
+    } catch (e) {
+      setFinanceResult({ success: false, error: e.message });
+    } finally {
+      setFinanceLoading(false);
+    }
+  };
+
+  return (
+    <motion.div
+      className="modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClose();
+      }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={{ zIndex: 10002 }}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="glass card modal"
+        style={{ maxWidth: '480px', width: '90%' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="title" style={{ marginBottom: 20 }}>
+          <RefreshIcon width="20" height="20" />
+          <span>指标数据更新</span>
+        </div>
+
+        {/* 股票收盘数据 */}
+        <div style={{ marginBottom: 20, padding: 16, background: 'rgba(255,255,255,0.03)', borderRadius: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div>
+              <div style={{ fontWeight: 500, marginBottom: 4 }}>股票收盘数据</div>
+              <div className="muted" style={{ fontSize: 12 }}>更新股票历史K线数据到最新交易日</div>
+            </div>
+            <button
+              className="button primary"
+              onClick={handleUpdateDailyStock}
+              disabled={dailyStockLoading}
+              style={{ minWidth: 80, padding: '8px 16px' }}
+            >
+              {dailyStockLoading ? '更新中...' : '更新'}
+            </button>
+          </div>
+          {dailyStockResult && (
+            <div style={{ marginTop: 12, padding: 12, background: dailyStockResult.success ? 'rgba(0,200,100,0.1)' : 'rgba(255,100,100,0.1)', borderRadius: 8, fontSize: 13 }}>
+              {dailyStockResult.success ? (
+                <span>
+                  更新完成
+                  {dailyStockResult.newRecords > 0 && `，新增 ${dailyStockResult.newRecords} 条`}
+                  {dailyStockResult.updatedRecords > 0 && `，更新今日 ${dailyStockResult.updatedRecords} 条`}
+                  {dailyStockResult.failedCount > 0 && `，失败 ${dailyStockResult.failedCount} 只`}
+                </span>
+              ) : (
+                <span style={{ color: '#ff6b6b' }}>{dailyStockResult.error || '更新失败'}</span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* 财务数据 */}
+        <div style={{ marginBottom: 20, padding: 16, background: 'rgba(255,255,255,0.03)', borderRadius: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div>
+              <div style={{ fontWeight: 500, marginBottom: 4 }}>财务数据</div>
+              <div className="muted" style={{ fontSize: 12 }}>更新季报、半年报、年报财务数据</div>
+            </div>
+            <button
+              className="button primary"
+              onClick={handleUpdateFinance}
+              disabled={financeLoading}
+              style={{ minWidth: 80, padding: '8px 16px' }}
+            >
+              {financeLoading ? '更新中...' : '更新'}
+            </button>
+          </div>
+          {financeResult && (
+            <div style={{ marginTop: 12, padding: 12, background: financeResult.success ? 'rgba(0,200,100,0.1)' : 'rgba(255,100,100,0.1)', borderRadius: 8, fontSize: 13 }}>
+              {financeResult.success ? (
+                <span>
+                  更新完成，新增 {financeResult.newRecords || 0} 条，更新 {financeResult.updateRecords || 0} 条
+                  {financeResult.failedCount > 0 && `，失败 ${financeResult.failedCount} 只`}
+                </span>
+              ) : (
+                <span style={{ color: '#ff6b6b' }}>{financeResult.error || '更新失败'}</span>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="row" style={{ justifyContent: 'flex-end', gap: 12 }}>
+          <button className="button secondary" onClick={onClose} style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text)' }}>关闭</button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 function GroupManageModal({ groups, onClose, onSave }) {
   const [items, setItems] = useState(groups);
   const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, name }
@@ -2275,6 +2407,7 @@ export default function HomePage() {
   const [actionModal, setActionModal] = useState({ open: false, fund: null });
   const [tradeModal, setTradeModal] = useState({ open: false, fund: null, type: 'buy' }); // type: 'buy' | 'sell'
   const [stockKlineModal, setStockKlineModal] = useState({ open: false, stock: null }); // 股票K线图弹框
+  const [dataUpdateModalOpen, setDataUpdateModalOpen] = useState(false); // 指标数据更新弹框
   const [clearConfirm, setClearConfirm] = useState(null); // { fund }
   const [holdings, setHoldings] = useState({}); // { [code]: { share: number, cost: number } }
   const [pendingTrades, setPendingTrades] = useState([]); // [{ id, fundCode, share, date, ... }]
@@ -2742,6 +2875,7 @@ export default function HomePage() {
   const scheduleSync = useCallback(() => {
     if (!userIdRef.current) return;
     if (skipSyncRef.current) return;
+    if (!isSupabaseConfigured) return;
     if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
     syncDebounceRef.current = setTimeout(() => {
       const payload = collectLocalPayload();
@@ -4106,6 +4240,14 @@ export default function HomePage() {
           >
             <RefreshIcon className={refreshing ? 'spin' : ''} width="18" height="18" />
           </button>
+          <button
+            className="icon-button"
+            aria-label="指标数据更新"
+            onClick={() => setDataUpdateModalOpen(true)}
+            title="指标数据更新"
+          >
+            <DatabaseIcon width="18" height="18" />
+          </button>
           {/*<button*/}
           {/*  className="icon-button"*/}
           {/*  aria-label="打开设置"*/}
@@ -5248,6 +5390,12 @@ export default function HomePage() {
             message={successModal.message}
             onClose={() => setSuccessModal({ open: false, message: '' })}
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {dataUpdateModalOpen && (
+          <DataUpdateModal onClose={() => setDataUpdateModalOpen(false)} />
         )}
       </AnimatePresence>
 
