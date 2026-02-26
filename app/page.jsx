@@ -442,7 +442,11 @@ function HistoryHoldingsModal({ fund, loading, data, onClose, onStockClick }) {
 }
 
 // 爬虫提示弹框组件
-function CrawlAlertModal({ fund, onClose }) {
+function CrawlAlertModal({ fund, message, onClose }) {
+  // 根据message判断状态
+  const isComplete = message?.includes('完成');
+  const isError = message?.includes('失败');
+  
   return (
     <motion.div
       className="modal-overlay"
@@ -467,34 +471,54 @@ function CrawlAlertModal({ fund, onClose }) {
             width: '60px', 
             height: '60px', 
             borderRadius: '50%', 
-            background: 'linear-gradient(135deg, var(--primary), var(--accent))',
+            background: isError 
+              ? 'linear-gradient(135deg, #ef4444, #f97316)'
+              : isComplete 
+                ? 'linear-gradient(135deg, #22c55e, #10b981)'
+                : 'linear-gradient(135deg, var(--primary), var(--accent))',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             margin: '0 auto 20px'
           }}>
-            <UpdateIcon width="28" height="28" />
+            {isError ? (
+              <span style={{ fontSize: '28px' }}>✕</span>
+            ) : isComplete ? (
+              <span style={{ fontSize: '28px' }}>✓</span>
+            ) : (
+              <UpdateIcon width="28" height="28" />
+            )}
           </div>
           
-          <h3 style={{ marginBottom: 12, fontSize: '18px' }}>数据抓取中</h3>
+          <h3 style={{ marginBottom: 12, fontSize: '18px' }}>
+            {isError ? '数据更新失败' : isComplete ? '数据更新完成' : '数据抓取中'}
+          </h3>
           
-          <p style={{ color: 'var(--text-secondary)', marginBottom: 8, lineHeight: 1.6 }}>
-            数据库暂无 <strong>{fund?.name}</strong> 的历史持仓数据
-          </p>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: 16, lineHeight: 1.6 }}>
-            正在执行数据抓取，请 <strong style={{ color: 'var(--accent)' }}>1分钟后再查看历史持仓</strong>
-          </p>
-          
-          <div style={{ 
-            background: 'rgba(255,255,255,0.05)', 
-            borderRadius: '8px', 
-            padding: '12px',
-            marginBottom: 20,
-            fontSize: '12px'
-          }}>
-            <p className="muted" style={{ marginBottom: 4 }}>抓取内容</p>
-            <p style={{ color: 'var(--text-secondary)' }}>最近3年（12个季度）的前十大持仓数据</p>
-          </div>
+          {message ? (
+            <p style={{ color: 'var(--text-secondary)', marginBottom: 16, lineHeight: 1.6, padding: '0 20px' }}>
+              {message}
+            </p>
+          ) : (
+            <>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: 8, lineHeight: 1.6 }}>
+                数据库暂无 <strong>{fund?.name}</strong> 的历史持仓数据
+              </p>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: 16, lineHeight: 1.6 }}>
+                正在执行数据抓取，请 <strong style={{ color: 'var(--accent)' }}>稍候...</strong>
+              </p>
+              
+              <div style={{ 
+                background: 'rgba(255,255,255,0.05)', 
+                borderRadius: '8px', 
+                padding: '12px',
+                marginBottom: 20,
+                fontSize: '12px'
+              }}>
+                <p className="muted" style={{ marginBottom: 4 }}>抓取内容</p>
+                <p style={{ color: 'var(--text-secondary)' }}>持仓数据 + 财务数据（自动联动）</p>
+              </div>
+            </>
+          )}
           
           <button 
             className="primary-button" 
@@ -2971,14 +2995,39 @@ export default function HomePage() {
       if (!data.periods || data.periods.length === 0 || data.totalPeriods === 0) {
         // 没有数据，关闭弹框，显示提示并启动爬虫
         setHistoryModal({ open: false, fund: null, loading: false, data: null });
-        setCrawlAlert({ open: true, fund });
+        setCrawlAlert({ open: true, fund, message: '正在获取持仓数据，请稍候...' });
         
-        // 后台执行爬虫
+        // 执行stocks爬虫，完成后自动触发财务数据更新
         fetch('/api/crawl', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fundCode: fund.code })
-        }).catch(err => console.error('爬虫执行失败:', err));
+        })
+        .then(res => res.json())
+        .then(result => {
+          if (result.success) {
+            // 持仓数据爬取完成，自动触发财务数据更新
+            setCrawlAlert({ open: true, fund, message: '持仓数据已获取，正在更新财务数据...' });
+            return fetch('/api/crawl/quarter-finance', { method: 'POST' });
+          }
+          throw new Error(result.error || '持仓数据获取失败');
+        })
+        .then(res => res ? res.json() : null)
+        .then(financeResult => {
+          if (financeResult?.success) {
+            setCrawlAlert({ 
+              open: true, 
+              fund, 
+              message: `数据更新完成！新增${financeResult.newRecords}条，更新${financeResult.updateRecords}条。请重新点击"持仓历史"查看。`
+            });
+          } else if (financeResult) {
+            setCrawlAlert({ open: true, fund, message: '财务数据更新失败，请手动点击"数据更新"按钮' });
+          }
+        })
+        .catch(err => {
+          console.error('爬虫执行失败:', err);
+          setCrawlAlert({ open: true, fund, message: '数据获取失败，请稍后重试' });
+        });
         
         return;
       }
@@ -3091,14 +3140,6 @@ export default function HomePage() {
 
   useEffect(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem('funds') || '[]');
-      if (Array.isArray(saved) && saved.length) {
-        const deduped = dedupeByCode(saved);
-        setFunds(deduped);
-        storageHelper.setItem('funds', JSON.stringify(deduped));
-        const codes = Array.from(new Set(deduped.map((f) => f.code)));
-        if (codes.length) refreshAll(codes);
-      }
       const savedMs = parseInt(localStorage.getItem('refreshMs') || '30000', 10);
       if (Number.isFinite(savedMs) && savedMs >= 5000) {
         setRefreshMs(savedMs);
@@ -3456,6 +3497,38 @@ export default function HomePage() {
     }
   };
 
+  // 从服务端加载基金列表
+  const loadFundsFromServer = useCallback(async (userId) => {
+    if (!userId) return;
+    try {
+      const res = await fetch(`/api/funds?userId=${userId}`);
+      const data = await res.json();
+      if (data.funds && Array.isArray(data.funds)) {
+        // 转换服务端数据格式为前端格式
+        const formattedFunds = data.funds.map(f => ({
+          id: f.id,
+          code: f.code,
+          name: f.name || '',
+          groupId: f.group_id || '',
+          createdAt: f.created_at
+        }));
+        setFunds(formattedFunds);
+        const codes = Array.from(new Set(formattedFunds.map(f => f.code)));
+        if (codes.length) refreshAll(codes);
+      }
+    } catch (e) {
+      console.error('加载基金列表失败:', e);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 用户登录后加载基金列表
+  useEffect(() => {
+    if (!user?.id) return;
+    loadFundsFromServer(user.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
   const toggleViewMode = () => {
     const nextMode = viewMode === 'card' ? 'list' : 'card';
     applyViewMode(nextMode);
@@ -3504,16 +3577,29 @@ export default function HomePage() {
       if (newFunds.length === 0) {
         setError('未添加任何新基金');
       } else {
+        // 先更新本地状态
         const next = dedupeByCode([...newFunds, ...funds]);
         setFunds(next);
-        storageHelper.setItem('funds', JSON.stringify(next));
         
-        // 同步到 CSV 文件（全量覆盖）
-        fetch('/api/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ funds: next, mode: 'replace' })
-        }).catch(() => {});
+        // 同步到服务端（使用批量添加 API）
+        if (user?.id) {
+          try {
+            const fundsToAdd = newFunds.map(f => ({
+              code: f.code,
+              name: f.name || ''
+            }));
+            await fetch('/api/funds', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                userId: user.id, 
+                funds: fundsToAdd 
+              })
+            });
+          } catch (syncErr) {
+            console.error('同步基金到服务端失败:', syncErr);
+          }
+        }
       }
       setSearchTerm('');
       setSelectedFunds([]);
@@ -3529,10 +3615,10 @@ export default function HomePage() {
     }
   };
 
-  const removeFund = (removeCode) => {
+  const removeFund = async (removeCode) => {
+    // 先更新本地状态
     const next = funds.filter((f) => f.code !== removeCode);
     setFunds(next);
-    storageHelper.setItem('funds', JSON.stringify(next));
 
     // 同步删除分组中的失效代码
     const nextGroups = groups.map(g => ({
@@ -3577,13 +3663,16 @@ export default function HomePage() {
       return next;
     });
 
-    // 同步到 CSV 文件（全量覆盖，删除后的列表）
-    const nextFunds = funds.filter((f) => f.code !== removeCode);
-    fetch('/api/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ funds: nextFunds, mode: 'replace' })
-    }).catch(() => {});
+    // 同步到服务端
+    if (user?.id) {
+      try {
+        await fetch(`/api/funds?userId=${user.id}&code=${removeCode}`, {
+          method: 'DELETE'
+        });
+      } catch (syncErr) {
+        console.error('同步删除基金到服务端失败:', syncErr);
+      }
+    }
   };
 
   const manualRefresh = async () => {

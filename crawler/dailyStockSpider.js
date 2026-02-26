@@ -1,5 +1,5 @@
 /**
- * 股票每日行情爬虫脚本
+ * 股票历史行情爬虫脚本
  * 用于爬取股票的历史K线数据（开盘价、收盘价、最高价、最低价、成交量、成交额等）
  *
  * 使用方法:
@@ -24,7 +24,7 @@ const path = require("path");
 // CSV 文件路径
 const DATA_DIR = path.join(__dirname, "..", "data");
 const STOCKS_FILE = path.join(DATA_DIR, "stocks.csv");
-const DAILY_STOCKS_FILE = path.join(DATA_DIR, "dailystock.csv");
+const STOCK_HISTORY_FILE = path.join(DATA_DIR, "stock_history.csv");
 
 // 请求头
 const HEADERS = {
@@ -143,12 +143,17 @@ async function getStockRealtimeQuote(stockCode) {
 
     // 字段索引（从0开始）：
     // 44: 总市值（亿元）, 45: 流通市值（亿元）
+    // 46: 市盈率（PE-TTM）, 47: 市净率（PB）
     const totalCapYi = parseFloat(parts[44]) || 0;
     const floatCapYi = parseFloat(parts[45]) || 0;
+    const pe_ttm = parseFloat(parts[46]) || 0;
+    const pb = parseFloat(parts[47]) || 0;
 
     return {
       total_cap: Math.round(totalCapYi * 100000000), // 转换为元
       float_cap: Math.round(floatCapYi * 100000000), // 转换为元
+      pe_ttm: pe_ttm,
+      pb: pb,
     };
   } catch (error) {
     return null;
@@ -169,7 +174,9 @@ async function getMarketCap(stockCode) {
   const quote = await getStockRealtimeQuote(stockCode);
   const data = quote ? {
     float_cap: quote.float_cap,
-    total_cap: quote.total_cap
+    total_cap: quote.total_cap,
+    pe_ttm: quote.pe_ttm,
+    pb: quote.pb,
   } : null;
 
   // 更新缓存
@@ -356,14 +363,14 @@ function getUniqueStocks() {
 }
 
 /**
- * 读取现有每日股票数据
+ * 读取现有股票历史数据
  */
-function readDailyStocks() {
-  if (!fs.existsSync(DAILY_STOCKS_FILE)) {
+function readStockHistory() {
+  if (!fs.existsSync(STOCK_HISTORY_FILE)) {
     return [];
   }
 
-  let content = fs.readFileSync(DAILY_STOCKS_FILE, "utf-8");
+  let content = fs.readFileSync(STOCK_HISTORY_FILE, "utf-8");
   if (content.charCodeAt(0) === 0xfeff) {
     content = content.slice(1);
   }
@@ -400,9 +407,9 @@ function getLatestDate(existingData, stockCode) {
 }
 
 /**
- * 写入每日股票数据
+ * 写入股票历史数据
  */
-function writeDailyStocks(records) {
+function writeStockHistory(records) {
   const headers = [
     "id",
     "stock_code",
@@ -417,6 +424,8 @@ function writeDailyStocks(records) {
     "amount",
     "float_cap",
     "turnover_rate",
+    "pe_ttm",
+    "pb",
     "created_at",
   ];
   const headerLine = headers.join(",");
@@ -436,7 +445,7 @@ function writeDailyStocks(records) {
   ];
 
   const BOM = "\uFEFF";
-  fs.writeFileSync(DAILY_STOCKS_FILE, BOM + lines.join("\n") + "\n", "utf-8");
+  fs.writeFileSync(STOCK_HISTORY_FILE, BOM + lines.join("\n") + "\n", "utf-8");
 }
 
 /**
@@ -490,6 +499,8 @@ function saveKlines(stockCode, stockName, klines, existingData, forceToday = fal
         amount: k.amount,
         float_cap: marketCap ? String(marketCap.float_cap) : "",
         turnover_rate: calculateTurnoverRate(k.amount),
+        pe_ttm: marketCap ? String(marketCap.pe_ttm) : "",
+        pb: marketCap ? String(marketCap.pb) : "",
         created_at: now,
       }));
     }
@@ -510,6 +521,8 @@ function saveKlines(stockCode, stockName, klines, existingData, forceToday = fal
         amount: k.amount,
         float_cap: marketCap ? String(marketCap.float_cap) : "",
         turnover_rate: calculateTurnoverRate(k.amount),
+        pe_ttm: marketCap ? String(marketCap.pe_ttm) : "",
+        pb: marketCap ? String(marketCap.pb) : "",
         created_at: now,
       }));
   } else {
@@ -530,6 +543,8 @@ function saveKlines(stockCode, stockName, klines, existingData, forceToday = fal
         amount: k.amount,
         float_cap: marketCap ? String(marketCap.float_cap) : "",
         turnover_rate: calculateTurnoverRate(k.amount),
+        pe_ttm: marketCap ? String(marketCap.pe_ttm) : "",
+        pb: marketCap ? String(marketCap.pb) : "",
         created_at: now,
       }));
   }
@@ -605,7 +620,7 @@ async function crawlAllStocks(days = 30, specificCodes = null, forceToday = fals
 
   console.log(`共 ${stocks.length} 只股票需要爬取${forceToday ? ' (强制更新今日收盘数据)' : ''}\n`);
 
-  const existingData = readDailyStocks();
+  const existingData = readStockHistory();
   console.log(`已有 ${existingData.length} 条历史数据\n`);
 
   let totalNew = 0;
@@ -630,7 +645,7 @@ async function crawlAllStocks(days = 30, specificCodes = null, forceToday = fals
         
         // 添加新数据和更新的今日数据
         allData = [...allData, ...newRecords, ...updatedRecords];
-        writeDailyStocks(allData);
+        writeStockHistory(allData);
         
         // 更新 existingData
         if (forceToday && updatedRecords.length > 0 && td) {
@@ -704,10 +719,10 @@ async function main() {
     fs.mkdirSync(DATA_DIR, { recursive: true });
   }
 
-  if (!fs.existsSync(DAILY_STOCKS_FILE)) {
+  if (!fs.existsSync(STOCK_HISTORY_FILE)) {
     fs.writeFileSync(
-      DAILY_STOCKS_FILE,
-      "\uFEFFid,stock_code,stock_name,trade_date,is_open,open,close,high,low,volume,amount,float_cap,turnover_rate,created_at\n",
+      STOCK_HISTORY_FILE,
+      "\uFEFFid,stock_code,stock_name,trade_date,is_open,open,close,high,low,volume,amount,float_cap,turnover_rate,pe_ttm,pb,created_at\n",
       "utf-8"
     );
   }

@@ -29,6 +29,7 @@ const path = require("path");
 const DATA_DIR = path.join(__dirname, "..", "data");
 const STOCKS_FILE = path.join(DATA_DIR, "stocks.csv");
 const QUARTER_FINANCE_FILE = path.join(DATA_DIR, "stock_quarter_finance.csv");
+// 注意: stock_history.csv 已合并到 dailystock.csv
 
 // 请求头
 const HEADERS = {
@@ -341,14 +342,8 @@ function writeQuarterFinance(dataMap) {
     "bps",
     "roe",
     "gross_margin",
-    "pe_ttm",
-    "pb",
-    "ps",
-    "total_market_cap",
-    "float_market_cap",
     "ttm_revenue",
     "ttm_net_profit",
-    "ttm_eps",
     "created_at",
   ];
   const headerLine = headers.join(",");
@@ -471,6 +466,7 @@ function calculateTtmMetrics(data, historicalValuation) {
 
 /**
  * 爬取单个股票的财务数据
+ * @returns {Object} { financeRecords: 季度财务数据 }
  */
 async function crawlStockFinance(stockCode, stockName, existingData, forceUpdate) {
   const keyPrefix = `${stockCode}_`;
@@ -482,7 +478,7 @@ async function crawlStockFinance(stockCode, stockName, existingData, forceUpdate
     ).length;
     if (existingCount >= 8) {
       console.log(`  已有 ${existingCount} 个季度数据，跳过`);
-      return [];
+      return { financeRecords: [] };
     }
   }
 
@@ -492,7 +488,7 @@ async function crawlStockFinance(stockCode, stockName, existingData, forceUpdate
   const financeData = await getFinanceFromReport(stockCode);
   if (financeData.length === 0) {
     console.log(`  无财务数据`);
-    return [];
+    return { financeRecords: [] };
   }
 
   // 获取扣非净利润
@@ -504,62 +500,16 @@ async function crawlStockFinance(stockCode, stockName, existingData, forceUpdate
   // 计算EPS同比增长率（PEG估值法核心指标）
   processedData = calculateEpsYoy(processedData);
 
-  // 获取实时市值数据
-  const marketData = await getMarketData(stockCode);
-
-  // 获取历史估值数据（用于PEG分析）
+  // 获取历史估值数据（用于TTM计算）
   const historicalValuation = await getHistoricalValuation(stockCode);
-
-  // 创建估值数据映射（按季度匹配）
-  const valuationMap = new Map();
-  historicalValuation.forEach((v) => {
-    if (v.trade_date) {
-      // 提取季度信息
-      const date = new Date(v.trade_date);
-      const year = date.getFullYear();
-      const month = date.getMonth() + 1;
-      let quarter = "Q1";
-      if (month >= 4 && month <= 6) quarter = "Q1";
-      else if (month >= 7 && month <= 9) quarter = "Q2";
-      else if (month >= 10 && month <= 12) quarter = "Q3";
-      else quarter = "Q4";
-      const key = `${year}${quarter}`;
-      valuationMap.set(key, v);
-    }
-  });
 
   // 计算TTM指标
   const ttmMetrics = calculateTtmMetrics(processedData, historicalValuation);
 
-  // 找出最新季度（processedData 是按季度升序排序的，所以最后一个是最新的）
-  const sortedByQuarter = [...processedData].sort((a, b) =>
-    b.report_quarter.localeCompare(a.report_quarter)
-  );
-  const latestQuarter = sortedByQuarter[0]?.report_quarter;
-
-  // 合并数据
+  // 生成季度财务数据记录
   const now = new Date().toISOString();
-  const newRecords = processedData.map((item) => {
+  const financeRecords = processedData.map((item) => {
     const key = `${stockCode}_${item.report_quarter}`;
-
-    // 尝试从历史估值数据获取PE/PB，如果没有则使用实时数据
-    const histVal = valuationMap.get(item.report_quarter);
-    // 只对最新季度使用实时PE/PB
-    const isLatestQuarter = item.report_quarter === latestQuarter;
-    const peTtm = histVal?.pe_ttm || (isLatestQuarter ? marketData?.pe_ttm : "") || "";
-    const pb = histVal?.pb || (isLatestQuarter ? marketData?.pb : "") || "";
-    const ps = histVal?.ps_ttm || "";
-
-    // 计算PS（如果历史数据没有，用市值/TTM营收计算）
-    let psCalc = ps;
-    if (!psCalc && marketData?.total_market_cap && ttmMetrics.ttm_revenue > 0) {
-      // 市值（亿）/ TTM营收（亿）
-      const revenueInYi = ttmMetrics.ttm_revenue / 100000000; // 转换为亿
-      if (revenueInYi > 0) {
-        psCalc = Math.round((marketData.total_market_cap / revenueInYi) * 100) / 100;
-      }
-    }
-
     return {
       id: existingData.has(key) ? existingData.get(key).id : generateId(),
       stock_code: stockCode,
@@ -578,20 +528,14 @@ async function crawlStockFinance(stockCode, stockName, existingData, forceUpdate
       bps: item.bps,
       roe: item.roe,
       gross_margin: item.gross_margin,
-      pe_ttm: peTtm,
-      pb: pb,
-      ps: psCalc,
-      total_market_cap: marketData?.total_market_cap || "",
-      float_market_cap: marketData?.float_market_cap || "",
       ttm_revenue: ttmMetrics.ttm_revenue,
       ttm_net_profit: ttmMetrics.ttm_net_profit,
-      ttm_eps: ttmMetrics.ttm_eps,
       created_at: now,
     };
   });
 
-  console.log(`  获取 ${newRecords.length} 个季度数据`);
-  return newRecords;
+  console.log(`  获取 ${financeRecords.length} 个季度财务数据`);
+  return { financeRecords };
 }
 
 /**
@@ -618,11 +562,11 @@ async function crawlAllStocks(specificCodes = null, forceUpdate = false) {
 
   console.log(`共 ${stocks.length} 只股票需要爬取\n`);
 
-  const existingData = readQuarterFinance();
-  console.log(`已有 ${existingData.size} 条财务数据\n`);
+  const existingFinanceData = readQuarterFinance();
+  console.log(`已有 ${existingFinanceData.size} 条财务数据\n`);
 
-  let newCount = 0;
-  let updateCount = 0;
+  let newFinanceCount = 0;
+  let updateFinanceCount = 0;
   let failCount = 0;
 
   for (let i = 0; i < stocks.length; i++) {
@@ -630,29 +574,30 @@ async function crawlAllStocks(specificCodes = null, forceUpdate = false) {
     console.log(`[${i + 1}/${stocks.length}] ${code} ${name || "(未知)"}`);
 
     try {
-      const records = await crawlStockFinance(
+      const { financeRecords } = await crawlStockFinance(
         code,
         name,
-        existingData,
+        existingFinanceData,
         forceUpdate
       );
 
-      if (records.length > 0) {
-        records.forEach((r) => {
+      // 保存财务数据
+      if (financeRecords.length > 0) {
+        financeRecords.forEach((r) => {
           const key = `${r.stock_code}_${r.report_quarter}`;
-          const isNew = !existingData.has(key);
-          existingData.set(key, r);
+          const isNew = !existingFinanceData.has(key);
+          existingFinanceData.set(key, r);
           if (isNew) {
-            newCount++;
+            newFinanceCount++;
           } else {
-            updateCount++;
+            updateFinanceCount++;
           }
         });
+      }
 
-        // 每获取 5 只股票保存一次
-        if ((newCount + updateCount) % 20 === 0) {
-          writeQuarterFinance(existingData);
-        }
+      // 每获取 20 只股票保存一次
+      if ((newFinanceCount + updateFinanceCount) % 20 === 0) {
+        writeQuarterFinance(existingFinanceData);
       }
     } catch (error) {
       console.log(`  爬取失败: ${error.message}`);
@@ -664,11 +609,10 @@ async function crawlAllStocks(specificCodes = null, forceUpdate = false) {
   }
 
   // 保存最终数据
-  writeQuarterFinance(existingData);
+  writeQuarterFinance(existingFinanceData);
 
   console.log(`\n爬取完成!`);
-  console.log(`  新增: ${newCount} 条`);
-  console.log(`  更新: ${updateCount} 条`);
+  console.log(`  财务数据 - 新增: ${newFinanceCount} 条, 更新: ${updateFinanceCount} 条`);
   console.log(`  失败: ${failCount} 条`);
 }
 

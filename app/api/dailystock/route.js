@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
-const DAILY_STOCKS_FILE = path.join(DATA_DIR, 'dailystock.csv');
+const STOCK_HISTORY_FILE = path.join(DATA_DIR, 'stock_history.csv');
 
 /**
  * 解析CSV行（处理引号内的逗号）
@@ -32,11 +32,11 @@ function parseCSVRow(line) {
  * 读取每日股票数据
  */
 function readDailyStocks() {
-  if (!fs.existsSync(DAILY_STOCKS_FILE)) {
+  if (!fs.existsSync(STOCK_HISTORY_FILE)) {
     return [];
   }
   
-  let content = fs.readFileSync(DAILY_STOCKS_FILE, 'utf-8');
+  let content = fs.readFileSync(STOCK_HISTORY_FILE, 'utf-8');
   
   // 移除 UTF-8 BOM 标记
   if (content.charCodeAt(0) === 0xFEFF) {
@@ -86,6 +86,8 @@ export async function GET(request) {
         amount: parseInt(d.amount, 10) || 0,
         float_cap: parseInt(d.float_cap, 10) || 0,
         turnover_rate: parseFloat(d.turnover_rate) || 0,
+        pe_ttm: parseFloat(d.pe_ttm) || 0,
+        pb: parseFloat(d.pb) || 0,
       }))
       .sort((a, b) => a.time.localeCompare(b.time)); // 按日期升序
     

@@ -32,6 +32,7 @@ export default function StockKlineModal({ stock, onClose }) {
   const [error, setError] = useState('');
   const [stockData, setStockData] = useState(null);
   const [crosshairData, setCrosshairData] = useState(null);
+  const [displayData, setDisplayData] = useState(null); // 当前显示的数据（鼠标悬停或最新一天）
   const [chartReady, setChartReady] = useState(false);
 
   // 动态加载 lightweight-charts
@@ -81,6 +82,10 @@ export default function StockKlineModal({ stock, onClose }) {
           setError(data.error);
         } else {
           setStockData(data);
+          // 设置默认显示最新一天数据
+          if (data.data?.length > 0) {
+            setDisplayData(data.data[data.data.length - 1]);
+          }
         }
       })
       .catch(err => {
@@ -180,7 +185,11 @@ export default function StockKlineModal({ stock, onClose }) {
     // 十字光标移动事件
     chart.subscribeCrosshairMove((param) => {
       if (!param.time) {
-        setCrosshairData(null);
+        // 鼠标移出，恢复显示最新一天数据
+        if (stockData?.data?.length > 0) {
+          setDisplayData(stockData.data[stockData.data.length - 1]);
+          setCrosshairData(null);
+        }
         return;
       }
       
@@ -188,14 +197,21 @@ export default function StockKlineModal({ stock, onClose }) {
       const volumeVal = param.seriesData.get(volumeSeries);
       
       if (candleData) {
-        setCrosshairData({
+        // 从原始数据中获取完整的当条数据
+        const dayData = stockData.data.find(d => d.time === param.time);
+        
+        const newCrosshairData = {
           time: param.time,
           open: candleData.open,
           high: candleData.high,
           low: candleData.low,
           close: candleData.close,
-          volume: volumeVal?.value || 0,
-        });
+          volume: volumeVal?.value || dayData?.volume || 0,
+          amount: dayData?.amount || 0,
+          turnover_rate: dayData?.turnover_rate || 0,
+        };
+        setCrosshairData(newCrosshairData);
+        setDisplayData(newCrosshairData);
       }
     });
     
@@ -226,17 +242,17 @@ export default function StockKlineModal({ stock, onClose }) {
 
   // 计算涨跌幅
   const getChangeInfo = useCallback(() => {
-    if (!crosshairData || !stockData?.data) return null;
+    if (!displayData || !stockData?.data) return null;
     
-    const idx = stockData.data.findIndex(d => d.time === crosshairData.time);
+    const idx = stockData.data.findIndex(d => d.time === displayData.time);
     if (idx <= 0) return null;
     
     const prev = stockData.data[idx - 1];
-    const change = crosshairData.close - prev.close;
+    const change = displayData.close - prev.close;
     const changePercent = (change / prev.close * 100).toFixed(2);
     
     return { change, changePercent };
-  }, [crosshairData, stockData]);
+  }, [displayData, stockData]);
 
   const changeInfo = getChangeInfo();
 
@@ -302,7 +318,7 @@ export default function StockKlineModal({ stock, onClose }) {
         </div>
 
         {/* 数据提示栏 */}
-        {crosshairData && (
+        {displayData && (
           <div style={{
             display: 'flex',
             gap: 16,
@@ -315,23 +331,23 @@ export default function StockKlineModal({ stock, onClose }) {
           }}>
             <div>
               <span className="muted">日期: </span>
-              <span style={{ fontWeight: 500 }}>{crosshairData.time}</span>
+              <span style={{ fontWeight: 500 }}>{displayData.time}</span>
             </div>
             <div>
               <span className="muted">开: </span>
-              <span style={{ fontWeight: 500 }}>{crosshairData.open.toFixed(2)}</span>
+              <span style={{ fontWeight: 500 }}>{displayData.open.toFixed(2)}</span>
             </div>
             <div>
               <span className="muted">高: </span>
-              <span style={{ fontWeight: 500, color: 'var(--danger)' }}>{crosshairData.high.toFixed(2)}</span>
+              <span style={{ fontWeight: 500, color: 'var(--danger)' }}>{displayData.high.toFixed(2)}</span>
             </div>
             <div>
               <span className="muted">低: </span>
-              <span style={{ fontWeight: 500, color: 'var(--success)' }}>{crosshairData.low.toFixed(2)}</span>
+              <span style={{ fontWeight: 500, color: 'var(--success)' }}>{displayData.low.toFixed(2)}</span>
             </div>
             <div>
               <span className="muted">收: </span>
-              <span style={{ fontWeight: 600 }}>{crosshairData.close.toFixed(2)}</span>
+              <span style={{ fontWeight: 600 }}>{displayData.close.toFixed(2)}</span>
             </div>
             {changeInfo && (
               <div>
@@ -346,8 +362,18 @@ export default function StockKlineModal({ stock, onClose }) {
             )}
             <div>
               <span className="muted">量: </span>
-              <span style={{ fontWeight: 500 }}>{formatNumber(crosshairData.volume)}</span>
+              <span style={{ fontWeight: 500 }}>{formatNumber(displayData.volume)}</span>
             </div>
+            <div>
+              <span className="muted">额: </span>
+              <span style={{ fontWeight: 500 }}>{formatNumber(displayData.amount)}</span>
+            </div>
+            {displayData.turnover_rate > 0 && (
+              <div>
+                <span className="muted">换手: </span>
+                <span style={{ fontWeight: 500 }}>{displayData.turnover_rate.toFixed(2)}%</span>
+              </div>
+            )}
           </div>
         )}
 

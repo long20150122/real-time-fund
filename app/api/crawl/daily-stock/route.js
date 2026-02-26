@@ -19,7 +19,7 @@ export async function POST() {
         PYTHONUTF8: '1'
       };
 
-      const child = spawn('node', [crawlerPath, '--days=30', '--force-today'], {
+      const child = spawn('node', [crawlerPath, '--days=90', '--force-today'], {
         cwd: process.cwd(),
         env: env,
         stdio: ['pipe', 'pipe', 'pipe'],
