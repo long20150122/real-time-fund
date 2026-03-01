@@ -1,0 +1,14 @@
+id,user_id,category_id,stock_code,stock_name,sort_order,add_date,add_price,is_favorite,created_at,updated_at
+mm65rgafj74kpw64b,test-user,,300034,钢研高纳,1,,,,2026-02-28T10:08:17.463Z,
+mm66j0sofglf9hsoc,ft001,mm6eowwawjiknf6yu,300034,钢研高纳,2,,,1,2026-02-28T10:29:43.753Z,2026-03-01T14:09:43.065Z
+mm66su553vfvrd9mz,test-user-comprehensive,,601398,工商银行,1,,,,2026-02-28T10:37:21.689Z,
+mm66wh49yhijljy72,ft001,mm64s6bntpl7wrjrd,300666,江丰电子,2,,,,2026-02-28T10:40:11.433Z,2026-03-01T10:15:43.042Z
+mm6f0z90d4vbzdbea,test-user-e2e-1772288856484,mm6f0y467l7m1fypn,601398,工商银行,1,,,,2026-02-28T14:27:38.484Z,
+mm6f138gfu45vpi3w,test-user-e2e-1772288856484,mm6f0y467l7m1fypn,600000,浦发银行,2,,,,2026-02-28T14:27:43.648Z,
+mm6f2ft5wtzrbmuwo,test-user-e2e-1772288924609,mm6f2epbbg879myqd,601398,工商银行,1,,,,2026-02-28T14:28:46.601Z,
+mm6f2jt9q1zdr0whm,test-user-e2e-1772288924609,mm6f2epbbg879myqd,600000,浦发银行,2,,,,2026-02-28T14:28:51.789Z,
+mm6hco4wlursdc7t6,ft001,mm64s6bntpl7wrjrd,300033,同花顺,1,2026-02-28,332.36,,2026-02-28T15:32:43.184Z,2026-03-01T10:15:43.044Z
+mm6hno1aw3jhvf3g0,ft001,mm64s6bntpl7wrjrd,601995,中金公司,3,2026-02-28,34.65,,2026-02-28T15:41:16.270Z,2026-03-01T10:15:43.041Z
+mm74pipps6klrmv7h,ft001,mm64s6bntpl7wrjrd,300059,东方财富,4,2026-03-01,22.52,0,2026-03-01T02:26:33.853Z,2026-03-01T10:15:43.039Z
+mm7trn8f0m6rvfkao,ft001,mm6eowwawjiknf6yu,002149,西部材料,1,2026-03-01,52.1,,2026-03-01T14:08:03.423Z,2026-03-01T14:09:43.067Z
+mm7u14p9j41uujbfg,ft001,mm6eoievhbo3i6mdx,600343,航天动力,1,2026-03-01,37.5,,2026-03-01T14:15:25.965Z,

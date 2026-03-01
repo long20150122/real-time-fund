@@ -88,6 +88,9 @@ export async function GET(request) {
         turnover_rate: parseFloat(d.turnover_rate) || 0,
         pe_ttm: parseFloat(d.pe_ttm) || 0,
         pb: parseFloat(d.pb) || 0,
+        rsi6: parseFloat(d.rsi6) || null,
+        rsi12: parseFloat(d.rsi12) || null,
+        rsi24: parseFloat(d.rsi24) || null,
       }))
       .sort((a, b) => a.time.localeCompare(b.time)); // 按日期升序
     

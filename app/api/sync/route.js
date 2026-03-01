@@ -79,7 +79,7 @@ export async function POST(request) {
   }
 }
 
-// 删除基金
+// 删除基金（同时软删除关联持仓）
 export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -87,6 +87,18 @@ export async function DELETE(request) {
 
     if (!code) {
       return NextResponse.json({ error: 'code is required' }, { status: 400 });
+    }
+
+    // 软删除关联的股票持仓数据
+    try {
+      const stocksResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/stocks?fundCode=${code}`, {
+        method: 'DELETE'
+      });
+      const stocksResult = await stocksResponse.json();
+      console.log(`[sync删除] 软删除持仓: fundCode=${code}, result=`, stocksResult);
+    } catch (e) {
+      console.error('[sync删除] 软删除持仓失败:', e);
+      // 继续删除基金，不影响主流程
     }
 
     const funds = readAll('funds');

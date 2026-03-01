@@ -16,14 +16,18 @@ export const CSV_FILES = {
   funds: path.join(DATA_DIR, 'funds.csv'),
   favorites: path.join(DATA_DIR, 'favorites.csv'),
   configs: path.join(DATA_DIR, 'configs.csv'),
+  watchlist_categories: path.join(DATA_DIR, 'watchlist_categories.csv'),
+  watchlist_stocks: path.join(DATA_DIR, 'watchlist_stocks.csv'),
 };
 
-// CSV 表头定义
+// CSV 表头定义（支持扩展字段）
 const HEADERS = {
   users: 'id,username,password,email,name,created_at,updated_at',
-  funds: 'id,user_id,code,name,group_id,created_at',
+  funds: 'id,user_id,code,name,group_id,is_deleted,deleted_at,extra_data,created_at',
   favorites: 'id,user_id,code,created_at',
   configs: 'id,user_id,data,updated_at',
+  watchlist_categories: 'id,user_id,parent_id,name,sort_order,is_system,created_at,updated_at',
+  watchlist_stocks: 'id,user_id,category_id,stock_code,stock_name,sort_order,add_date,add_price,is_favorite,created_at,updated_at',
 };
 
 // 初始化 CSV 文件

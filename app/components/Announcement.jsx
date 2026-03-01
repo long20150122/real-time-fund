@@ -2,11 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useLockBodyScroll } from '../hooks/useLockBodyScroll';
 
 const ANNOUNCEMENT_KEY = 'hasClosedAnnouncement_v7';
 
 export default function Announcement() {
   const [isVisible, setIsVisible] = useState(false);
+
+  // 锁定背景滚动
+  useLockBodyScroll(isVisible);
 
   useEffect(() => {
     const hasClosed = localStorage.getItem(ANNOUNCEMENT_KEY);

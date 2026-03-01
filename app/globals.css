@@ -8,6 +8,9 @@
   --success: #34d399;
   --danger: #f87171;
   --border: #1f2937;
+  /* 涨跌颜色：红涨绿跌 */
+  --up: #f87171;
+  --down: #34d399;
 }
 
 * {
@@ -815,6 +818,12 @@ input[type="number"] {
 .spin {
   animation: spin 0.8s linear infinite;
 }
+
+/* 刷新状态指示灯脉冲动画 */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
 .icon-button[aria-busy="true"] {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(96,165,250,0.15);
@@ -1379,5 +1388,25 @@ input[type="number"] {
   .login-modal {
     max-width: 100% !important;
     margin: 16px;
+  }
+}
+
+/* ========== 自选股弹窗样式 ========== */
+.watchlist-modal {
+  padding: 0 !important;
+}
+
+.watchlist-modal .title {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+@media (max-width: 640px) {
+  .watchlist-modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    border-radius: 0;
+    border: none;
   }
 }

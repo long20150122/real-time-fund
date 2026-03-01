@@ -1,0 +1,10 @@
+id,user_id,parent_id,name,sort_order,is_system,created_at,updated_at
+mm64s6bntpl7wrjrd,ft001,,自选,0,1,2026-02-28T09:40:51.587Z,
+mm6dzqzft6drstcg6,test,,自选,0,1,2026-02-28T13:58:41.499Z,
+mm6em6wwjqjm944n0,ft001,,商业航天,1,0,2026-02-28T14:16:08.576Z,
+mm6eoievhbo3i6mdx,ft001,mm6em6wwjqjm944n0,发动机核心零部件,1,0,2026-02-28T14:17:56.791Z,
+mm6eowwawjiknf6yu,ft001,mm6em6wwjqjm944n0,高温合金方向,2,0,2026-02-28T14:18:15.562Z,
+mm6epnfzpuias8ow3,ft001,mm6em6wwjqjm944n0,碳纤维壳体,3,0,2026-02-28T14:18:49.967Z,
+mm6f0y467l7m1fypn,test-user-e2e-1772288856484,,自选,0,1,2026-02-28T14:27:37.014Z,
+mm6f2epbbg879myqd,test-user-e2e-1772288924609,,自选,0,1,2026-02-28T14:28:45.167Z,
+mm6fdnxo5afyv8oxe,test_user,,自选,0,1,2026-02-28T14:37:30.348Z,

@@ -1,4 +1,4 @@
-# 实时基金估值 (Real-time Fund Valuation)
+# 研估宝 (Real-time Fund Valuation)
 
 一个基于 Next.js 开发的纯前端基金估值与重仓股实时追踪工具。采用玻璃拟态设计（Glassmorphism），支持移动端适配。
 预览地址：[https://hzm0321.github.io/real-time-fund/](https://hzm0321.github.io/real-time-fund/)

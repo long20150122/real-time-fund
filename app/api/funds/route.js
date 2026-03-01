@@ -82,7 +82,7 @@ export async function PUT(request) {
   }
 }
 
-// 删除基金
+// 删除基金（同时软删除关联持仓）
 export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -94,6 +94,32 @@ export async function DELETE(request) {
       return NextResponse.json({ error: 'userId is required' }, { status: 400 });
     }
 
+    let fundCode = code;
+    
+    // 如果通过 id 删除，先获取基金代码
+    if (id && !fundCode) {
+      const { find } = await import('../../lib/csv');
+      const fund = find('funds', f => f.id === id && f.user_id === userId);
+      if (!fund) {
+        return NextResponse.json({ error: 'Fund not found' }, { status: 404 });
+      }
+      fundCode = fund.code;
+    }
+
+    // 软删除关联的股票持仓数据
+    if (fundCode) {
+      try {
+        const stocksResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/stocks?fundCode=${fundCode}`, {
+          method: 'DELETE'
+        });
+        const stocksResult = await stocksResponse.json();
+        console.log(`[基金删除] 软删除持仓: fundCode=${fundCode}, result=`, stocksResult);
+      } catch (e) {
+        console.error('[基金删除] 软删除持仓失败:', e);
+        // 继续删除基金，不影响主流程
+      }
+    }
+
     if (id) {
       const result = await dataAdapter.removeFund(userId, id);
       if (!result.success) {
@@ -102,8 +128,8 @@ export async function DELETE(request) {
       return NextResponse.json({ success: true });
     }
 
-    if (code) {
-      const result = await dataAdapter.removeFundByCode(userId, code);
+    if (fundCode) {
+      const result = await dataAdapter.removeFundByCode(userId, fundCode);
       return NextResponse.json({ success: true, deleted: result.deleted });
     }
 

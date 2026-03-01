@@ -4,7 +4,7 @@
 
 | 属性 | 值 |
 |------|-----|
-| **项目名称** | real-time-fund (实时基金估值) |
+| **项目名称** | real-time-fund (研估宝) |
 | **版本** | 0.1.5 |
 | **类型** | 纯前端 Web 应用 |
 | **开源协议** | GNU Affero General Public License v3.0 (AGPL-3.0) |

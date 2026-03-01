@@ -9,13 +9,14 @@ import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import Announcement from "./components/Announcement";
 import { DatePicker, NumericInput, Stat } from "./components/Common";
-import { ChevronIcon, CloseIcon, CloudIcon, DatabaseIcon, DragIcon, ExitIcon, EyeIcon, EyeOffIcon, GridIcon, ListIcon, LoginIcon, LogoutIcon, MailIcon, PinIcon, PinOffIcon, PlusIcon, RefreshIcon, SettingsIcon, SortIcon, StarIcon, TrashIcon, UpdateIcon, UserIcon } from "./components/Icons";
+import { ChevronIcon, CloseIcon, CloudIcon, DatabaseIcon, DragIcon, ExitIcon, EyeIcon, EyeOffIcon, GridIcon, LayersIcon, ListIcon, LoginIcon, LogoutIcon, MailIcon, PinIcon, PinOffIcon, PlusIcon, RefreshIcon, SettingsIcon, SortIcon, StarIcon, TrashIcon, UpdateIcon, UserIcon, BookmarkIcon } from "./components/Icons";
 import StockKlineModal from "./components/StockKlineChart";
+import WatchlistModal from "./components/WatchlistModal";
 import githubImg from "./assets/github.svg";
 import weChatGroupImg from "./assets/weChatGroup.png";
 import { supabase, isSupabaseConfigured } from './lib/supabase';
-import { fetchFundData, fetchLatestRelease, fetchShanghaiIndexDate, fetchSmartFundNetValue, searchFunds, submitFeedback } from './api/fund';
-import packageJson from '../package.json';
+import { fetchFundData, fetchShanghaiIndexDate, fetchSmartFundNetValue, searchFunds, submitFeedback } from './api/fund';
+import { useLockBodyScroll } from './hooks/useLockBodyScroll';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -26,10 +27,215 @@ const nowInTz = () => dayjs().tz(TZ);
 const toTz = (input) => (input ? dayjs.tz(input, TZ) : nowInTz());
 const formatDate = (input) => toTz(input).format('YYYY-MM-DD');
 
+function IndustryModal({ onClose, data }) {
+  const [expandedL1, setExpandedL1] = useState(null);
+  const [expandedL2, setExpandedL2] = useState(null);
+  const [expandedL3, setExpandedL3] = useState(null);
+
+  // 锁定背景滚动
+  useLockBodyScroll(true);
+
+  return (
+    <motion.div
+      className="modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Wind行业分类"
+      onClick={onClose}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="glass card modal industry-modal"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: 750, maxHeight: '85vh', overflow: 'hidden' }}
+      >
+        <div className="title" style={{ marginBottom: 16, justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <LayersIcon width="20" height="20" />
+            <span>Wind行业分类</span>
+          </div>
+          <button className="icon-button" onClick={onClose} style={{ border: 'none', background: 'transparent' }}>
+            <CloseIcon width="20" height="20" />
+          </button>
+        </div>
+
+        {/* 统计信息 */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 16, padding: '12px 16px', background: 'var(--card-bg)', borderRadius: 8 }}>
+          <div style={{ flex: 1, textAlign: 'center' }}>
+            <div style={{ fontSize: 22, fontWeight: 'bold', color: 'var(--primary)' }}>{data.l1Count}</div>
+            <div className="muted" style={{ fontSize: 11 }}>一级行业</div>
+          </div>
+          <div style={{ width: 1, background: 'var(--border-color)' }} />
+          <div style={{ flex: 1, textAlign: 'center' }}>
+            <div style={{ fontSize: 22, fontWeight: 'bold', color: 'var(--primary)' }}>{data.l2Count}</div>
+            <div className="muted" style={{ fontSize: 11 }}>二级行业</div>
+          </div>
+          <div style={{ width: 1, background: 'var(--border-color)' }} />
+          <div style={{ flex: 1, textAlign: 'center' }}>
+            <div style={{ fontSize: 22, fontWeight: 'bold', color: 'var(--primary)' }}>{data.l3Count}</div>
+            <div className="muted" style={{ fontSize: 11 }}>三级行业</div>
+          </div>
+          <div style={{ width: 1, background: 'var(--border-color)' }} />
+          <div style={{ flex: 1, textAlign: 'center' }}>
+            <div style={{ fontSize: 22, fontWeight: 'bold', color: 'var(--primary)' }}>{data.l4Count}</div>
+            <div className="muted" style={{ fontSize: 11 }}>四级行业</div>
+          </div>
+        </div>
+
+        {/* 分类树 */}
+        <div style={{ overflow: 'auto', maxHeight: 'calc(85vh - 180px)' }}>
+          {data.tree.map((l1) => (
+            <div key={l1.code} style={{ marginBottom: 4 }}>
+              {/* 一级分类 */}
+              <div
+                onClick={() => setExpandedL1(expandedL1 === l1.code ? null : l1.code)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '10px 12px',
+                  background: expandedL1 === l1.code ? 'var(--primary-light)' : 'var(--card-bg)',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  transition: 'background 0.2s',
+                }}
+              >
+                <ChevronIcon
+                  width="16"
+                  height="16"
+                  style={{
+                    transform: expandedL1 === l1.code ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.2s',
+                  }}
+                />
+                <span style={{ fontWeight: 500 }}>{l1.code} {l1.name}</span>
+              </div>
+
+              {/* 二级分类 */}
+              <AnimatePresence>
+                {expandedL1 === l1.code && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    style={{ paddingLeft: 20, overflow: 'hidden' }}
+                  >
+                    {Array.from(l1.l2.values()).map((l2) => (
+                      <div key={l2.code}>
+                        <div
+                          onClick={() => setExpandedL2(expandedL2 === `${l1.code}-${l2.code}` ? null : `${l1.code}-${l2.code}`)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            padding: '7px 10px',
+                            margin: '2px 0',
+                            background: expandedL2 === `${l1.code}-${l2.code}` ? 'var(--hover-bg)' : 'transparent',
+                            borderRadius: 4,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <ChevronIcon
+                            width="14"
+                            height="14"
+                            style={{
+                              transform: expandedL2 === `${l1.code}-${l2.code}` ? 'rotate(180deg)' : 'rotate(0deg)',
+                              transition: 'transform 0.2s',
+                            }}
+                          />
+                          <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>{l2.code} {l2.name}</span>
+                        </div>
+
+                        {/* 三级分类 */}
+                        <AnimatePresence>
+                          {expandedL2 === `${l1.code}-${l2.code}` && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              style={{ paddingLeft: 24, overflow: 'hidden' }}
+                            >
+                              {Array.from(l2.l3.values()).map((l3) => (
+                                <div key={l3.code}>
+                                  <div
+                                    onClick={() => setExpandedL3(expandedL3 === `${l1.code}-${l2.code}-${l3.code}` ? null : `${l1.code}-${l2.code}-${l3.code}`)}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: 6,
+                                      padding: '5px 10px',
+                                      margin: '1px 0',
+                                      background: expandedL3 === `${l1.code}-${l2.code}-${l3.code}` ? 'var(--hover-bg)' : 'transparent',
+                                      borderRadius: 4,
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    <ChevronIcon
+                                      width="12"
+                                      height="12"
+                                      style={{
+                                        transform: expandedL3 === `${l1.code}-${l2.code}-${l3.code}` ? 'rotate(180deg)' : 'rotate(0deg)',
+                                        transition: 'transform 0.2s',
+                                      }}
+                                    />
+                                    <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>{l3.code} {l3.name}</span>
+                                  </div>
+
+                                  {/* 四级分类 */}
+                                  <AnimatePresence>
+                                    {expandedL3 === `${l1.code}-${l2.code}-${l3.code}` && (
+                                      <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: 'auto', opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        style={{ paddingLeft: 28, overflow: 'hidden' }}
+                                      >
+                                        {l3.l4.map((l4) => (
+                                          <div
+                                            key={l4.code}
+                                            style={{
+                                              padding: '4px 10px',
+                                              margin: '1px 0',
+                                              color: 'var(--text-muted)',
+                                              fontSize: 12,
+                                            }}
+                                          >
+                                            {l4.code} {l4.name}
+                                          </div>
+                                        ))}
+                                      </motion.div>
+                                    )}
+                                  </AnimatePresence>
+                                </div>
+                              ))}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 function FeedbackModal({ onClose, user, onOpenWeChat }) {
   const [submitting, setSubmitting] = useState(false);
   const [succeeded, setSucceeded] = useState(false);
   const [error, setError] = useState("");
+
+  // 锁定背景滚动
+  useLockBodyScroll(true);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -44,7 +250,7 @@ function FeedbackModal({ onClose, user, onOpenWeChat }) {
 
     // Web3Forms Access Key
     formData.append("access_key", process.env.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY || '');
-    formData.append("subject", "基估宝 - 用户反馈");
+    formData.append("subject", "研估宝 - 用户反馈");
 
     try {
       const data = await submitFeedback(formData);
@@ -169,6 +375,9 @@ function FeedbackModal({ onClose, user, onOpenWeChat }) {
 }
 
 function WeChatModal({ onClose }) {
+  // 锁定背景滚动
+  useLockBodyScroll(true);
+
   return (
     <motion.div
       className="modal-overlay"
@@ -210,6 +419,9 @@ function WeChatModal({ onClose }) {
 
 // 历史持仓弹窗组件
 function HistoryHoldingsModal({ fund, loading, data, onClose, onStockClick }) {
+  // 锁定背景滚动
+  useLockBodyScroll(true);
+
   const formatDate = (dateStr) => {
     if (!dateStr) return '';
     const date = new Date(dateStr);
@@ -223,6 +435,50 @@ function HistoryHoldingsModal({ fund, loading, data, onClose, onStockClick }) {
     if (num > 15) return 'var(--accent)';
     if (num > 0) return 'var(--primary)';
     return 'var(--success)';
+  };
+
+  // 获取股票的环比变化信息
+  const getStockChangeInfo = (stock, period, periodIndex, allPeriods) => {
+    if (periodIndex >= allPeriods.length - 1) return null;
+    
+    const comparison = period.comparison;
+    if (!comparison) return null;
+
+    // 检查是否是新调入
+    const added = comparison.added.find(s => s.stock_code === stock.stock_code);
+    if (added) {
+      return { type: 'added' };
+    }
+
+    // 检查是否是增持
+    const increased = comparison.increased.find(s => s.stock_code === stock.stock_code);
+    if (increased) {
+      return { 
+        type: 'increased', 
+        change: increased.weight_change, 
+        prevWeight: increased.prev_weight,
+        currentWeight: increased.current_weight
+      };
+    }
+
+    // 检查是否是减持
+    const decreased = comparison.decreased.find(s => s.stock_code === stock.stock_code);
+    if (decreased) {
+      return { 
+        type: 'decreased', 
+        change: decreased.weight_change, 
+        prevWeight: decreased.prev_weight,
+        currentWeight: decreased.current_weight
+      };
+    }
+
+    // 持仓不变
+    const unchanged = comparison.unchanged.find(s => s.stock_code === stock.stock_code);
+    if (unchanged) {
+      return { type: 'unchanged' };
+    }
+
+    return null;
   };
 
   return (
@@ -242,19 +498,19 @@ function HistoryHoldingsModal({ fund, loading, data, onClose, onStockClick }) {
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
         className="glass card modal"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '600px', maxHeight: '80vh', overflow: 'auto' }}
+        style={{ width: '95vw', maxWidth: '1400px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
       >
-        <div className="title" style={{ marginBottom: 20, justifyContent: 'space-between' }}>
+        <div className="title" style={{ marginBottom: 16, justifyContent: 'space-between', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <UpdateIcon width="20" height="20" />
-            <span>历史持仓</span>
+            <span>历史持仓环比分析</span>
           </div>
           <button className="icon-button" onClick={onClose} style={{ border: 'none', background: 'transparent' }}>
             <CloseIcon width="20" height="20" />
           </button>
         </div>
 
-        <div style={{ marginBottom: 20, textAlign: 'center' }}>
+        <div style={{ marginBottom: 16, textAlign: 'center', flexShrink: 0 }}>
           <div className="fund-name" style={{ fontWeight: 600, fontSize: '16px', marginBottom: 4 }}>{fund?.name}</div>
           <div className="muted" style={{ fontSize: '12px' }}>#{fund?.code}</div>
         </div>
@@ -293,149 +549,537 @@ function HistoryHoldingsModal({ fund, loading, data, onClose, onStockClick }) {
             </code>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            {data.periods.map((period, index) => (
-              <div key={period.report_date} className="history-period" style={{
-                border: '1px solid var(--border)',
-                borderRadius: '12px',
-                padding: '16px',
-                background: 'rgba(255,255,255,0.02)'
-              }}>
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center',
-                  marginBottom: 12,
-                  paddingBottom: 12,
-                  borderBottom: '1px solid rgba(255,255,255,0.05)'
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(3, 1fr)', 
+            gap: 12, 
+            overflow: 'auto',
+            flex: 1,
+            paddingRight: 4
+          }}>
+            {data.periods.map((period, index) => {
+              const comparison = period.comparison;
+              const hasComparison = comparison && index < data.periods.length - 1;
+              
+              return (
+                <div key={period.report_date} className="history-period" style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: '10px',
+                  padding: '12px',
+                  background: 'rgba(255,255,255,0.02)',
+                  display: 'flex',
+                  flexDirection: 'column'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontWeight: 600 }}>{formatDate(period.report_date)}</span>
-                    <span className="muted" style={{ fontSize: '12px' }}>
-                      ({period.stocks.length}只)
-                    </span>
-                  </div>
-                  {index < data.periods.length - 1 && (
-                    <div style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: 8,
-                      fontSize: '12px'
-                    }}>
-                      <span className="muted">相对上期变化:</span>
-                      <span style={{ 
-                        color: getChangeRateColor(period.changeRate),
-                        fontWeight: 600
-                      }}>
-                        {period.changeRate}%
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    marginBottom: 8,
+                    paddingBottom: 8,
+                    borderBottom: '1px solid rgba(255,255,255,0.05)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontWeight: 600, fontSize: '13px' }}>{formatDate(period.report_date)}</span>
+                      <span className="muted" style={{ fontSize: '11px' }}>
+                        ({period.stocks.length}只)
                       </span>
-                      {period.addedCount > 0 && (
-                        <span style={{ color: 'var(--success)', fontSize: '11px' }}>
-                          +{period.addedCount}
+                    </div>
+                    {hasComparison && (
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: 4,
+                        fontSize: '11px'
+                      }}>
+                        <span style={{ 
+                          color: getChangeRateColor(period.changeRate),
+                          fontWeight: 600
+                        }}>
+                          {period.changeRate}%
                         </span>
+                        {period.addedCount > 0 && (
+                          <span style={{ color: 'var(--success)', fontSize: '10px' }}>
+                            +{period.addedCount}
+                          </span>
+                        )}
+                        {period.removedCount > 0 && (
+                          <span style={{ color: 'var(--danger)', fontSize: '10px' }}>
+                            -{period.removedCount}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 环比变化汇总 - 紧凑版 */}
+                  {hasComparison && (comparison.increased.length > 0 || comparison.decreased.length > 0) && (
+                    <div style={{ 
+                      marginBottom: 8, 
+                      padding: '6px 8px', 
+                      background: 'rgba(255,255,255,0.03)', 
+                      borderRadius: 6,
+                      display: 'flex',
+                      gap: 12,
+                      fontSize: '11px'
+                    }}>
+                      {comparison.increased.length > 0 && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ color: 'var(--danger)' }}>↑{comparison.increased.length}</span>
+                          <span style={{ color: 'var(--danger)', opacity: 0.8 }}>
+                            +{comparison.summary.totalWeightIncreased}%
+                          </span>
+                        </div>
                       )}
-                      {period.removedCount > 0 && (
-                        <span style={{ color: 'var(--danger)', fontSize: '11px' }}>
-                          -{period.removedCount}
-                        </span>
+                      {comparison.decreased.length > 0 && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ color: 'var(--success)' }}>↓{comparison.decreased.length}</span>
+                          <span style={{ color: 'var(--success)', opacity: 0.8 }}>
+                            {comparison.summary.totalWeightDecreased}%
+                          </span>
+                        </div>
                       )}
                     </div>
                   )}
-                </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {period.stocks.map((stock, idx) => (
-                    <div 
-                      key={stock.stock_code || idx} 
-                      onClick={() => onStockClick?.({ code: stock.stock_code, name: stock.stock_name })}
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        padding: '6px 8px',
-                        borderBottom: idx < period.stocks.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none',
-                        cursor: 'pointer',
-                        borderRadius: 6,
-                        transition: 'background 0.2s',
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(34, 211, 238, 0.08)'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span className="muted" style={{ fontSize: '12px', minWidth: '20px' }}>{idx + 1}</span>
-                        <span style={{ fontSize: '14px' }}>{stock.stock_name}</span>
-                        <span className="muted" style={{ fontSize: '11px', fontFamily: 'monospace' }}>
-                          {stock.stock_code}
-                        </span>
-                        {stock.status === 'new' && (
-                          <span style={{ 
-                            fontSize: '10px', 
-                            color: 'var(--success)', 
-                            background: 'rgba(34, 197, 94, 0.15)',
-                            padding: '1px 6px',
-                            borderRadius: '4px',
-                            fontWeight: 500
-                          }}>
-                            调入
-                          </span>
-                        )}
-                        <span style={{ 
-                          fontSize: '10px', 
-                          color: 'var(--primary)', 
-                          opacity: 0.6,
-                        }}>
-                          📈
-                        </span>
-                      </div>
-                      <span style={{ 
-                        fontSize: '13px', 
-                        color: 'var(--accent)',
-                        fontWeight: 500
-                      }}>
-                        {stock.weight}
-                      </span>
-                    </div>
-                  ))}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
+                    {period.stocks.map((stock, idx) => {
+                      const changeInfo = getStockChangeInfo(stock, period, index, data.periods);
+                      
+                      return (
+                        <div 
+                          key={stock.stock_code || idx} 
+                          onClick={() => onStockClick?.({ code: stock.stock_code, name: stock.stock_name })}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '3px 6px',
+                            cursor: 'pointer',
+                            borderRadius: 4,
+                            transition: 'background 0.2s',
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(34, 211, 238, 0.08)'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0 }}>
+                            <span className="muted" style={{ fontSize: '10px', minWidth: '14px' }}>{idx + 1}</span>
+                            <span style={{ fontSize: '12px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stock.stock_name}</span>
+                            {/* 新调入标签 */}
+                            {changeInfo?.type === 'added' && (
+                              <span style={{ 
+                                fontSize: '9px', 
+                                color: 'var(--success)', 
+                                background: 'rgba(34, 197, 94, 0.15)',
+                                padding: '0 4px',
+                                borderRadius: '3px',
+                                fontWeight: 500,
+                                flexShrink: 0
+                              }}>
+                                新
+                              </span>
+                            )}
+                            {/* 增持标签 - 红色向上箭头 */}
+                            {changeInfo?.type === 'increased' && (
+                              <span style={{ 
+                                fontSize: '9px', 
+                                color: 'var(--danger)', 
+                                background: 'rgba(239, 68, 68, 0.15)',
+                                padding: '0 4px',
+                                borderRadius: '3px',
+                                fontWeight: 500,
+                                flexShrink: 0
+                              }}>
+                                ↑+{changeInfo.change.toFixed(1)}%
+                              </span>
+                            )}
+                            {/* 减持标签 - 绿色向下箭头 */}
+                            {changeInfo?.type === 'decreased' && (
+                              <span style={{ 
+                                fontSize: '9px', 
+                                color: 'var(--success)', 
+                                background: 'rgba(34, 197, 94, 0.15)',
+                                padding: '0 4px',
+                                borderRadius: '3px',
+                                fontWeight: 500,
+                                flexShrink: 0
+                              }}>
+                                ↓{changeInfo.change.toFixed(1)}%
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                            {/* 显示上期持仓比例 */}
+                            {changeInfo && changeInfo.type !== 'added' && changeInfo.prevWeight !== undefined && (
+                              <span className="muted" style={{ fontSize: '10px' }}>
+                                {changeInfo.prevWeight.toFixed(1)}%
+                              </span>
+                            )}
+                            {/* 箭头 */}
+                            {changeInfo && changeInfo.type !== 'added' && changeInfo.prevWeight !== undefined && (
+                              <span style={{ color: 'var(--border)', fontSize: '8px' }}>→</span>
+                            )}
+                            {/* 本期持仓比例 */}
+                            <span style={{ 
+                              fontSize: '11px', 
+                              color: 'var(--accent)',
+                              fontWeight: 500
+                            }}>
+                              {stock.weight}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
                   {/* 显示调出的股票 */}
-                  {period.removedStocks && period.removedStocks.length > 0 && (
-                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
-                      <div className="muted" style={{ fontSize: '12px', marginBottom: 8 }}>调出股票:</div>
-                      {period.removedStocks.map((stock, idx) => (
-                        <div key={`removed-${stock.stock_code || idx}`} style={{
+                  {hasComparison && comparison.removed.length > 0 && (
+                    <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
+                      <div style={{ fontSize: '10px', color: 'var(--danger)', marginBottom: 4, fontWeight: 500 }}>
+                        调出 ({comparison.removed.length}只):
+                      </div>
+                      {comparison.removed.slice(0, 3).map((stock) => (
+                        <div key={`removed-${stock.stock_code}`} style={{
                           display: 'flex',
                           justifyContent: 'space-between',
                           alignItems: 'center',
-                          padding: '4px 0',
-                          opacity: 0.6
+                          padding: '2px 0',
+                          opacity: 0.5,
+                          fontSize: '11px'
                         }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ fontSize: '13px', textDecoration: 'line-through' }}>{stock.stock_name}</span>
-                            <span className="muted" style={{ fontSize: '11px', fontFamily: 'monospace' }}>
-                              {stock.stock_code}
-                            </span>
-                            <span style={{ 
-                              fontSize: '10px', 
-                              color: 'var(--danger)', 
-                              background: 'rgba(239, 68, 68, 0.15)',
-                              padding: '1px 6px',
-                              borderRadius: '4px',
-                              fontWeight: 500
-                            }}>
-                              调出
-                            </span>
-                          </div>
-                          <span className="muted" style={{ fontSize: '12px' }}>
-                            {stock.weight}
+                          <span style={{ textDecoration: 'line-through' }}>{stock.stock_name}</span>
+                          <span className="muted" style={{ fontSize: '10px' }}>
+                            {stock.prev_weight?.toFixed(1)}%
                           </span>
                         </div>
                       ))}
+                      {comparison.removed.length > 3 && (
+                        <div style={{ fontSize: '10px', color: 'var(--muted)', marginTop: 2 }}>
+                          +{comparison.removed.length - 3}只...
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// 股票汇总弹窗组件
+function StockListModal({ loading, data, onClose, onStockClick }) {
+  const [sortField, setSortField] = useState('fund_count');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [filterText, setFilterText] = useState('');
+  const [selectedStock, setSelectedStock] = useState(null);
+
+  // 锁定背景滚动
+  useLockBodyScroll(true);
+
+  // 格式化市值
+  const formatCap = (cap) => {
+    if (!cap) return '-';
+    const num = parseFloat(cap);
+    if (num >= 10000) return (num / 10000).toFixed(2) + '万亿';
+    if (num >= 1) return num.toFixed(2) + '亿';
+    return num.toFixed(2) + '亿';
+  };
+
+  // 格式化价格
+  const formatPrice = (price) => {
+    if (!price) return '-';
+    return parseFloat(price).toFixed(2);
+  };
+
+  // 获取涨跌幅颜色
+  const getChangeColor = (change) => {
+    const num = parseFloat(change);
+    if (num > 0) return 'var(--danger)';
+    if (num < 0) return 'var(--success)';
+    return 'var(--text-secondary)';
+  };
+
+  // 排序和过滤
+  const processedData = useMemo(() => {
+    if (!data?.data) return [];
+    
+    let result = [...data.data];
+    
+    // 过滤
+    if (filterText) {
+      const text = filterText.toLowerCase();
+      result = result.filter(s => 
+        s.stock_name?.toLowerCase().includes(text) ||
+        s.stock_code?.toLowerCase().includes(text)
+      );
+    }
+    
+    // 排序
+    result.sort((a, b) => {
+      let aVal = a[sortField];
+      let bVal = b[sortField];
+      
+      // 处理数字类型
+      if (['fund_count', 'consecutive_up_days', 'consecutive_down_days', 'historical_fund_count'].includes(sortField)) {
+        aVal = parseFloat(aVal) || 0;
+        bVal = parseFloat(bVal) || 0;
+      } else if (['total_cap', 'float_cap', 'latest_price', 'change_percent'].includes(sortField)) {
+        aVal = parseFloat(aVal) || 0;
+        bVal = parseFloat(bVal) || 0;
+      }
+      
+      if (sortOrder === 'asc') {
+        return aVal > bVal ? 1 : -1;
+      }
+      return aVal < bVal ? 1 : -1;
+    });
+    
+    return result;
+  }, [data, sortField, sortOrder, filterText]);
+
+  // 切换排序
+  const toggleSort = (field) => {
+    if (sortField === field) {
+      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('desc');
+    }
+  };
+
+  // 渲染排序箭头
+  const SortArrow = ({ field }) => {
+    if (sortField !== field) return <span style={{ opacity: 0.3 }}>↕</span>;
+    return sortOrder === 'asc' ? <span style={{ color: 'var(--primary)' }}>↑</span> : <span style={{ color: 'var(--primary)' }}>↓</span>;
+  };
+
+  return (
+    <motion.div
+      className="modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="股票汇总"
+      onClick={onClose}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="glass card modal"
+        onClick={(e) => e.stopPropagation()}
+        style={{ 
+          width: '95vw', 
+          maxWidth: '1400px', 
+          maxHeight: '90vh', 
+          overflow: 'hidden', 
+          display: 'flex', 
+          flexDirection: 'column' 
+        }}
+      >
+        {/* 标题栏 */}
+        <div className="title" style={{ marginBottom: 12, justifyContent: 'space-between', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <GridIcon width="20" height="20" />
+            <span>持仓股票汇总</span>
+            {!loading && data?.total && (
+              <span className="muted" style={{ fontSize: '12px' }}>({data.total}只)</span>
+            )}
+          </div>
+          <button className="icon-button" onClick={onClose} style={{ border: 'none', background: 'transparent' }}>
+            <CloseIcon width="20" height="20" />
+          </button>
+        </div>
+
+        {/* 信息栏 */}
+        {!loading && data && (
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 16, 
+            marginBottom: 12, 
+            padding: '8px 12px',
+            background: 'rgba(255,255,255,0.03)',
+            borderRadius: 8,
+            flexShrink: 0,
+            flexWrap: 'wrap'
+          }}>
+            <span className="muted" style={{ fontSize: '12px' }}>
+              报告期: {data.report_date}
+            </span>
+            <span className="muted" style={{ fontSize: '12px' }}>
+              最后更新: {data.last_update || '未知'}
+            </span>
+            {/* 活跃/历史统计 */}
+            <span style={{ 
+              fontSize: '12px', 
+              padding: '2px 8px', 
+              borderRadius: 4, 
+              background: 'rgba(34, 197, 94, 0.15)', 
+              color: '#22c55e' 
+            }}>
+              活跃: {data.active_count || 0}
+            </span>
+            <span style={{ 
+              fontSize: '12px', 
+              padding: '2px 8px', 
+              borderRadius: 4, 
+              background: 'rgba(245, 158, 11, 0.15)', 
+              color: '#f59e0b' 
+            }}>
+              历史: {data.historical_count || 0}
+            </span>
+            {/* 搜索框 */}
+            <input
+              type="text"
+              placeholder="搜索股票名称或代码..."
+              value={filterText}
+              onChange={(e) => setFilterText(e.target.value)}
+              style={{
+                flex: 1,
+                maxWidth: 200,
+                minWidth: 120,
+                padding: '6px 12px',
+                borderRadius: 6,
+                border: '1px solid var(--border)',
+                background: 'rgba(0,0,0,0.2)',
+                color: 'var(--text)',
+                fontSize: '12px'
+              }}
+            />
+          </div>
+        )}
+
+        {/* 内容区 */}
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '40px 0' }}>
+            <div className="loading-spinner" style={{ 
+              width: '40px', 
+              height: '40px', 
+              border: '3px solid rgba(255,255,255,0.1)', 
+              borderTop: '3px solid var(--primary)',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite',
+              margin: '0 auto 16px'
+            }} />
+            <p className="muted">正在加载股票数据...</p>
+          </div>
+        ) : data?.error ? (
+          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--danger)' }}>
+            <p>{data.error}</p>
+          </div>
+        ) : (
+          <div style={{ flex: 1, overflow: 'auto' }}>
+            {/* 表头 */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '80px 100px 80px 80px 100px 100px 70px 70px 70px 70px 80px',
+              gap: 8,
+              padding: '8px 12px',
+              background: 'rgba(255,255,255,0.05)',
+              borderRadius: '8px 8px 0 0',
+              position: 'sticky',
+              top: 0,
+              zIndex: 10,
+              fontSize: '12px',
+              fontWeight: 600
+            }}>
+              <button onClick={() => toggleSort('stock_code')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 4 }}>代码 <SortArrow field="stock_code" /></button>
+              <button onClick={() => toggleSort('stock_name')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 4 }}>名称 <SortArrow field="stock_name" /></button>
+              <button onClick={() => toggleSort('latest_price')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', textAlign: 'right', display: 'flex', alignItems: 'center', gap: 4 }}>最新价 <SortArrow field="latest_price" /></button>
+              <button onClick={() => toggleSort('change_percent')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', textAlign: 'right', display: 'flex', alignItems: 'center', gap: 4 }}>涨跌幅 <SortArrow field="change_percent" /></button>
+              <button onClick={() => toggleSort('total_cap')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', textAlign: 'right', display: 'flex', alignItems: 'center', gap: 4 }}>总市值 <SortArrow field="total_cap" /></button>
+              <button onClick={() => toggleSort('float_cap')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', textAlign: 'right', display: 'flex', alignItems: 'center', gap: 4 }}>流通市值 <SortArrow field="float_cap" /></button>
+              <button onClick={() => toggleSort('consecutive_up_days')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', textAlign: 'center', display: 'flex', alignItems: 'center', gap: 4 }}>连涨 <SortArrow field="consecutive_up_days" /></button>
+              <button onClick={() => toggleSort('consecutive_down_days')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', textAlign: 'center', display: 'flex', alignItems: 'center', gap: 4 }}>连跌 <SortArrow field="consecutive_down_days" /></button>
+              <button onClick={() => toggleSort('pe_ttm')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', textAlign: 'right', display: 'flex', alignItems: 'center', gap: 4 }}>PE <SortArrow field="pe_ttm" /></button>
+              <button onClick={() => toggleSort('fund_count')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', textAlign: 'center', display: 'flex', alignItems: 'center', gap: 4 }}>活跃基金 <SortArrow field="fund_count" /></button>
+              <button onClick={() => toggleSort('historical_fund_count')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', textAlign: 'center', display: 'flex', alignItems: 'center', gap: 4 }}>历史基金 <SortArrow field="historical_fund_count" /></button>
+            </div>
+
+            {/* 数据行 */}
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {processedData.map((stock, idx) => {
+                const isHistorical = stock.is_historical;
+                return (
+                  <div
+                    key={stock.stock_code}
+                    onClick={() => setSelectedStock(stock)}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '80px 100px 80px 80px 100px 100px 70px 70px 70px 70px 80px',
+                      gap: 8,
+                      padding: '10px 12px',
+                      borderBottom: '1px solid var(--border)',
+                      cursor: 'pointer',
+                      transition: 'background 0.15s',
+                      fontSize: '13px',
+                      background: isHistorical ? 'rgba(245, 158, 11, 0.05)' : 'transparent',
+                      opacity: isHistorical ? 0.85 : 1
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = isHistorical ? 'rgba(245, 158, 11, 0.12)' : 'rgba(34, 211, 238, 0.08)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = isHistorical ? 'rgba(245, 158, 11, 0.05)' : 'transparent'}
+                  >
+                    <span className="muted">{stock.stock_code}</span>
+                    <span style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {stock.stock_name}
+                      {isHistorical && (
+                        <span style={{ 
+                          fontSize: '10px', 
+                          padding: '1px 4px', 
+                          borderRadius: 3, 
+                          background: 'rgba(245, 158, 11, 0.2)', 
+                          color: '#f59e0b' 
+                        }}>历史</span>
+                      )}
+                    </span>
+                    <span style={{ textAlign: 'right', color: 'var(--accent)' }}>{formatPrice(stock.latest_price)}</span>
+                    <span style={{ textAlign: 'right', color: getChangeColor(stock.change_percent), fontWeight: 500 }}>
+                      {stock.change_percent ? `${parseFloat(stock.change_percent) > 0 ? '+' : ''}${stock.change_percent}%` : '-'}
+                    </span>
+                    <span style={{ textAlign: 'right' }}>{formatCap(stock.total_cap)}</span>
+                    <span style={{ textAlign: 'right' }}>{formatCap(stock.float_cap)}</span>
+                    <span style={{ textAlign: 'center', color: stock.consecutive_up_days > 0 ? 'var(--danger)' : 'var(--text-secondary)' }}>
+                      {stock.consecutive_up_days || 0}
+                    </span>
+                    <span style={{ textAlign: 'center', color: stock.consecutive_down_days > 0 ? 'var(--success)' : 'var(--text-secondary)' }}>
+                      {stock.consecutive_down_days || 0}
+                    </span>
+                    <span style={{ textAlign: 'right' }}>{stock.pe_ttm || '-'}</span>
+                    <span style={{ textAlign: 'center', fontWeight: 600, color: stock.fund_count > 0 ? 'var(--primary)' : 'var(--muted)' }}>
+                      {stock.fund_count}
+                    </span>
+                    <span style={{ textAlign: 'center', color: stock.historical_fund_count > 0 ? '#f59e0b' : 'var(--muted)', fontSize: '12px' }}>
+                      {stock.historical_fund_count || 0}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {processedData.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                <p className="muted">暂无数据</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* K线图弹窗 */}
+        <AnimatePresence>
+          {selectedStock && (
+            <StockKlineModal
+              stock={{ code: selectedStock.stock_code, name: selectedStock.stock_name }}
+              onClose={() => setSelectedStock(null)}
+            />
+          )}
+        </AnimatePresence>
       </motion.div>
     </motion.div>
   );
@@ -446,7 +1090,10 @@ function CrawlAlertModal({ fund, message, onClose }) {
   // 根据message判断状态
   const isComplete = message?.includes('完成');
   const isError = message?.includes('失败');
-  
+
+  // 锁定背景滚动
+  useLockBodyScroll(true);
+
   return (
     <motion.div
       className="modal-overlay"
@@ -534,6 +1181,9 @@ function CrawlAlertModal({ fund, message, onClose }) {
 }
 
 function HoldingActionModal({ fund, onClose, onAction }) {
+  // 锁定背景滚动
+  useLockBodyScroll(true);
+
   return (
     <motion.div
       className="modal-overlay"
@@ -602,6 +1252,10 @@ function TradeModal({ type, fund, holding, onClose, onConfirm, pendingTrades = [
   const [share, setShare] = useState('');
   const [amount, setAmount] = useState('');
   const [feeRate, setFeeRate] = useState('0');
+
+  // 锁定背景滚动
+  useLockBodyScroll(true);
+
   const [date, setDate] = useState(() => {
     return formatDate();
   });
@@ -1272,6 +1926,9 @@ function TradeModal({ type, fund, holding, onClose, onConfirm, pendingTrades = [
 function HoldingEditModal({ fund, holding, onClose, onSave }) {
   const [mode, setMode] = useState('amount'); // 'amount' | 'share'
 
+  // 锁定背景滚动
+  useLockBodyScroll(true);
+
   // 基础数据
   const dwjz = fund?.dwjz || fund?.gsz || 0;
 
@@ -1512,6 +2169,9 @@ function HoldingEditModal({ fund, holding, onClose, onSave }) {
 }
 
 function AddResultModal({ failures, onClose }) {
+  // 锁定背景滚动
+  useLockBodyScroll(true);
+
   return (
     <motion.div
       className="modal-overlay"
@@ -1561,6 +2221,9 @@ function AddResultModal({ failures, onClose }) {
 }
 
 function SuccessModal({ message, onClose }) {
+  // 锁定背景滚动
+  useLockBodyScroll(true);
+
   return (
     <motion.div
       className="modal-overlay"
@@ -1594,6 +2257,10 @@ function SuccessModal({ message, onClose }) {
 
 function CloudConfigModal({ onConfirm, onCancel, type = 'empty' }) {
   const isConflict = type === 'conflict';
+
+  // 锁定背景滚动
+  useLockBodyScroll(true);
+
   return (
     <motion.div
       className="modal-overlay"
@@ -1643,6 +2310,9 @@ function CloudConfigModal({ onConfirm, onCancel, type = 'empty' }) {
 }
 
 function ConfirmModal({ title, message, onConfirm, onCancel, confirmText = "确定删除" }) {
+  // 锁定背景滚动
+  useLockBodyScroll(true);
+
   return (
     <motion.div
       className="modal-overlay"
@@ -1687,6 +2357,10 @@ function DataUpdateModal({ onClose }) {
   const [financeLoading, setFinanceLoading] = useState(false);
   const [dailyStockResult, setDailyStockResult] = useState(null);
   const [financeResult, setFinanceResult] = useState(null);
+
+  // 锁定背景滚动
+  useLockBodyScroll(true);
+
 
   const handleUpdateDailyStock = async () => {
     setDailyStockLoading(true);
@@ -1816,6 +2490,9 @@ function DataUpdateModal({ onClose }) {
 function GroupManageModal({ groups, onClose, onSave }) {
   const [items, setItems] = useState(groups);
   const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, name }
+
+  // 锁定背景滚动
+  useLockBodyScroll(true);
 
   const handleReorder = (newOrder) => {
     setItems(newOrder);
@@ -2005,6 +2682,9 @@ function GroupManageModal({ groups, onClose, onSave }) {
 function AddFundToGroupModal({ allFunds, currentGroupCodes, onClose, onAdd }) {
   const [selected, setSelected] = useState(new Set());
 
+  // 锁定背景滚动
+  useLockBodyScroll(true);
+
   // 过滤出未在当前分组中的基金
   const availableFunds = (allFunds || []).filter(f => !(currentGroupCodes || []).includes(f.code));
 
@@ -2090,6 +2770,10 @@ function AddFundToGroupModal({ allFunds, currentGroupCodes, onClose, onAdd }) {
 
 function GroupModal({ onClose, onConfirm }) {
   const [name, setName] = useState('');
+
+  // 锁定背景滚动
+  useLockBodyScroll(true);
+
   return (
     <motion.div
       className="modal-overlay"
@@ -2181,6 +2865,551 @@ function CountUp({ value, prefix = '', suffix = '', decimals = 2, className = ''
     <span className={className} style={style}>
       {prefix}{Math.abs(displayValue).toFixed(decimals)}{suffix}
     </span>
+  );
+}
+
+// 持仓并集分析弹窗组件
+function HoldingsUnionModal({ isOpen, onClose, funds, onStockClick }) {
+  const [stockPrices, setStockPrices] = useState({}); // 股票实时价格数据
+  const stockPricesRef = useRef({}); // 缓存价格数据，避免闪烁
+  const [loadingPrices, setLoadingPrices] = useState(false);
+  const [quarterData, setQuarterData] = useState([]); // 所有季度的持仓数据
+  const [currentQuarterIndex, setCurrentQuarterIndex] = useState(0); // 当前季度索引
+  const [loadingQuarters, setLoadingQuarters] = useState(false);
+  const [isSwitchingQuarter, setIsSwitchingQuarter] = useState(false); // 防止快速切换
+
+  // 锁定背景滚动
+  useLockBodyScroll(isOpen);
+
+  // 获取季度字符串（如"2025年第三季度"）
+  const formatQuarter = (dateStr) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    const quarter = Math.ceil((date.getMonth() + 1) / 3);
+    return `${date.getFullYear()}年第${quarter}季度`;
+  };
+
+  // 弹窗关闭时清空价格缓存
+  useEffect(() => {
+    if (!isOpen) {
+      stockPricesRef.current = {};
+      setStockPrices({});
+    }
+  }, [isOpen]);
+
+  // 获取所有基金的历史持仓数据
+  useEffect(() => {
+    if (!isOpen || funds.length === 0) return;
+
+    const fetchAllHistoryHoldings = async () => {
+      setLoadingQuarters(true);
+      const allQuarters = new Map(); // quarterKey -> { reportDate, holdings: Map<code, holding> }
+
+      // 获取每只基金的历史持仓
+      for (const fund of funds) {
+        try {
+          const res = await fetch(`/api/fund-history?code=${fund.code}`);
+          const data = await res.json();
+
+          if (data.periods && data.periods.length > 0) {
+            data.periods.forEach(period => {
+              const quarterKey = formatQuarter(period.report_date);
+
+              if (!allQuarters.has(quarterKey)) {
+                allQuarters.set(quarterKey, {
+                  reportDate: period.report_date,
+                  quarterKey,
+                  holdings: new Map()
+                });
+              }
+
+              const quarterInfo = allQuarters.get(quarterKey);
+
+              // 添加该基金的持仓到季度数据中
+              period.stocks.forEach(stock => {
+                const stockCode = stock.stock_code;
+                if (!quarterInfo.holdings.has(stockCode)) {
+                  quarterInfo.holdings.set(stockCode, {
+                    code: stockCode,
+                    name: stock.stock_name,
+                    funds: []
+                  });
+                }
+
+                const holding = quarterInfo.holdings.get(stockCode);
+                holding.funds.push({
+                  code: fund.code,
+                  name: fund.name,
+                  ratio: parseFloat(stock.weight || stock.ratio || 0)
+                });
+              });
+            });
+          }
+        } catch (e) {
+          console.error(`获取基金 ${fund.code} 历史持仓失败`, e);
+        }
+      }
+
+      // 转换为数组并按日期排序（最新的在前）
+      const sortedQuarters = Array.from(allQuarters.values())
+        .sort((a, b) => new Date(b.reportDate) - new Date(a.reportDate));
+
+      setQuarterData(sortedQuarters);
+      setCurrentQuarterIndex(0); // 默认显示最新季度
+      setLoadingQuarters(false);
+    };
+
+    fetchAllHistoryHoldings();
+  }, [isOpen, funds]);
+
+  // 当前季度的持仓并集
+  const holdingsUnion = useMemo(() => {
+    if (quarterData.length === 0) return [];
+
+    const currentQuarter = quarterData[currentQuarterIndex];
+    if (!currentQuarter) return [];
+
+    // 转换为数组并排序：按基金数量降序，再按持仓比例降序
+    return Array.from(currentQuarter.holdings.values())
+      .sort((a, b) => {
+        if (b.funds.length !== a.funds.length) {
+          return b.funds.length - a.funds.length;
+        }
+        const ratioA = a.funds[0]?.ratio || 0;
+        const ratioB = b.funds[0]?.ratio || 0;
+        return ratioB - ratioA;
+      });
+  }, [quarterData, currentQuarterIndex]);
+
+  // 当前季度信息
+  const currentQuarter = quarterData[currentQuarterIndex];
+  const isLatestQuarter = currentQuarterIndex === 0;
+  const isOldestQuarter = currentQuarterIndex === quarterData.length - 1;
+
+  // 切换到上一季度（更新的）
+  const goToPrevQuarter = () => {
+    if (isSwitchingQuarter || currentQuarterIndex <= 0) return;
+    
+    setIsSwitchingQuarter(true);
+    setCurrentQuarterIndex(currentQuarterIndex - 1);
+    
+    // 300ms 防抖，防止快速点击
+    setTimeout(() => setIsSwitchingQuarter(false), 300);
+  };
+
+  // 切换到下一季度（更老的）
+  const goToNextQuarter = () => {
+    if (isSwitchingQuarter || currentQuarterIndex >= quarterData.length - 1) return;
+    
+    setIsSwitchingQuarter(true);
+    setCurrentQuarterIndex(currentQuarterIndex + 1);
+    
+    // 300ms 防抖，防止快速点击
+    setTimeout(() => setIsSwitchingQuarter(false), 300);
+  };
+
+  // 获取股票实时价格数据（增量更新，避免闪烁）
+  useEffect(() => {
+    if (!isOpen || holdingsUnion.length === 0) return;
+
+    const fetchStockPrices = async () => {
+      // 检查哪些股票需要获取价格（新出现的股票）
+      const existingCodes = Object.keys(stockPricesRef.current);
+      const neededStocks = holdingsUnion.filter(s => !existingCodes.includes(s.code));
+      
+      // 如果所有股票都已经有价格数据，不需要重新获取
+      if (neededStocks.length === 0) {
+        setStockPrices(stockPricesRef.current);
+        return;
+      }
+
+      setLoadingPrices(true);
+      
+      // 复制现有价格数据（保持已有价格不变，避免闪烁）
+      const prices = { ...stockPricesRef.current };
+
+      // 批量获取新股票的价格（每批10只，避免请求过多）
+      const batchSize = 10;
+      for (let i = 0; i < neededStocks.length; i += batchSize) {
+        const batch = neededStocks.slice(i, i + batchSize);
+        const promises = batch.map(async (stock) => {
+          try {
+            const res = await fetch(`/api/dailystock?code=${stock.code}`);
+            const result = await res.json();
+            // API 返回格式: { code, name, count, data: [...], stats: {...} }
+            if (result && result.data && result.data.length > 0) {
+              // 获取最新一天的数据
+              const stockData = result.data;
+              const latest = stockData[stockData.length - 1];
+              const prev = stockData.length > 1 ? stockData[stockData.length - 2] : latest;
+              const change = prev ? ((latest.close - prev.close) / prev.close * 100) : 0;
+
+              prices[stock.code] = {
+                price: latest.close,
+                change: change,
+                prevClose: prev?.close || latest.close,
+                date: latest.time
+              };
+            } else {
+              console.log(`股票 ${stock.code} 无数据:`, result.error || '未知原因');
+            }
+          } catch (e) {
+            console.error(`获取股票 ${stock.code} 价格失败`, e);
+          }
+        });
+
+        await Promise.all(promises);
+
+        // 延迟一下，避免请求过快
+        if (i + batchSize < neededStocks.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+
+      // 更新缓存和状态
+      stockPricesRef.current = prices;
+      setStockPrices(prices);
+      setLoadingPrices(false);
+    };
+
+    fetchStockPrices();
+  }, [isOpen, holdingsUnion]);
+
+  // 统计信息
+  const stats = useMemo(() => {
+    const totalStocks = holdingsUnion.length;
+    const singleFundStocks = holdingsUnion.filter(s => s.funds.length === 1).length;
+    const multiFundStocks = holdingsUnion.filter(s => s.funds.length > 1).length;
+    const maxOverlap = holdingsUnion.length > 0 ? Math.max(...holdingsUnion.map(s => s.funds.length)) : 0;
+    const mostOverlapped = holdingsUnion.filter(s => s.funds.length === maxOverlap);
+
+    return { totalStocks, singleFundStocks, multiFundStocks, maxOverlap, mostOverlapped };
+  }, [holdingsUnion]);
+
+  // 获取涨跌幅颜色
+  const getChangeColor = (change) => {
+    if (change > 0) return '#ef4444'; // 红色（涨）
+    if (change < 0) return '#22c55e'; // 绿色（跌）
+    return 'var(--muted)';
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <motion.div
+      className="modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="持仓并集分析"
+      onClick={onClose}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="glass card modal holdings-union-modal"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: '1000px', width: '95vw', maxHeight: '90vh' }}
+      >
+        {/* 标题栏 */}
+        <div className="title" style={{ marginBottom: 16, justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <GridIcon width="20" height="20" />
+            <span>持仓并集分析</span>
+            <span className="muted" style={{ fontSize: '0.85rem' }}>
+              共 {funds.length} 只基金
+            </span>
+          </div>
+          <button className="icon-button" onClick={onClose} style={{ border: 'none', background: 'transparent' }}>
+            <CloseIcon width="20" height="20" />
+          </button>
+        </div>
+
+        {/* 加载中状态 - 只在初始加载且没有数据时显示 */}
+        {loadingQuarters && quarterData.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '20px', color: 'var(--muted)' }}>
+            <div style={{
+              width: '24px',
+              height: '24px',
+              border: '2px solid rgba(255,255,255,0.1)',
+              borderTop: '2px solid var(--primary)',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite',
+              margin: '0 auto 12px'
+            }} />
+            正在加载历史持仓数据...
+          </div>
+        )}
+
+        {/* 统计信息 + 季度切换 */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(5, 1fr)',
+          gap: '12px',
+          marginBottom: 20,
+          padding: '16px',
+          background: 'rgba(255,255,255,0.03)',
+          borderRadius: '12px',
+          border: '1px solid var(--border)'
+        }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--accent)' }}>{stats.totalStocks}</div>
+            <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: 4 }}>持仓股票总数</div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: '#22c55e' }}>{stats.multiFundStocks}</div>
+            <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: 4 }}>多基金重仓</div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: '#f59e0b' }}>{stats.singleFundStocks}</div>
+            <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: 4 }}>单基金特有</div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: '#ef4444' }}>{stats.maxOverlap}</div>
+            <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: 4 }}>最大重叠数</div>
+          </div>
+
+          {/* 季度切换 - 放在最右边 */}
+          {quarterData.length > 0 && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              borderLeft: '1px solid var(--border)',
+              paddingLeft: '12px'
+            }}>
+              {/* 左箭头 - 更新的季度 */}
+              <button
+                onClick={goToPrevQuarter}
+                disabled={isLatestQuarter || isSwitchingQuarter}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: (isLatestQuarter || isSwitchingQuarter) ? 'rgba(255,255,255,0.05)' : 'rgba(34, 211, 238, 0.2)',
+                  color: (isLatestQuarter || isSwitchingQuarter) ? 'var(--muted)' : 'var(--accent)',
+                  cursor: (isLatestQuarter || isSwitchingQuarter) ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s',
+                  opacity: isSwitchingQuarter ? 0.5 : 1
+                }}
+                title={isLatestQuarter ? '已是最新季度' : isSwitchingQuarter ? '切换中...' : '查看更新的季度'}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M15 18l-6-6 6-6"/>
+                </svg>
+              </button>
+
+              {/* 当前季度显示 */}
+              <div style={{ textAlign: 'center', minWidth: '100px' }}>
+                <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)' }}>
+                  {currentQuarter?.quarterKey || '-'}
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--muted)' }}>
+                  {currentQuarterIndex + 1} / {quarterData.length}
+                </div>
+              </div>
+
+              {/* 右箭头 - 更老的季度 */}
+              <button
+                onClick={goToNextQuarter}
+                disabled={isOldestQuarter || isSwitchingQuarter}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: (isOldestQuarter || isSwitchingQuarter) ? 'rgba(255,255,255,0.05)' : 'rgba(34, 211, 238, 0.2)',
+                  color: (isOldestQuarter || isSwitchingQuarter) ? 'var(--muted)' : 'var(--accent)',
+                  cursor: (isOldestQuarter || isSwitchingQuarter) ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s',
+                  opacity: isSwitchingQuarter ? 0.5 : 1
+                }}
+                title={isOldestQuarter ? '已是最早季度' : isSwitchingQuarter ? '切换中...' : '查看更早的季度'}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 18l6-6-6-6"/>
+                </svg>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* 股票列表 */}
+        <div style={{
+          maxHeight: 'calc(90vh - 220px)',
+          overflow: 'auto',
+          borderRadius: '12px',
+          border: '1px solid var(--border)'
+        }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead style={{
+              position: 'sticky',
+              top: 0,
+              background: 'rgba(15,23,42,0.95)',
+              zIndex: 1
+            }}>
+              <tr>
+                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: 600, borderBottom: '1px solid var(--border)', width: '180px' }}>股票名称</th>
+                <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '13px', fontWeight: 600, borderBottom: '1px solid var(--border)', width: '100px' }}>最新价</th>
+                <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '13px', fontWeight: 600, borderBottom: '1px solid var(--border)', width: '90px' }}>涨跌幅</th>
+                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '13px', fontWeight: 600, borderBottom: '1px solid var(--border)', width: '90px' }}>重仓基金</th>
+                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>基金持仓明细</th>
+              </tr>
+            </thead>
+            <tbody>
+              {holdingsUnion.map((stock, index) => {
+                const priceData = stockPrices[stock.code];
+                const isMultiFund = stock.funds.length > 1;
+
+                return (
+                  <tr
+                    key={stock.code}
+                    style={{
+                      background: index % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)',
+                      borderBottom: '1px solid rgba(255,255,255,0.05)',
+                      cursor: onStockClick ? 'pointer' : 'default',
+                      transition: 'background 0.2s'
+                    }}
+                    onClick={() => onStockClick?.({ code: stock.code, name: stock.name })}
+                    onMouseEnter={(e) => onStockClick && (e.currentTarget.style.background = 'rgba(34, 211, 238, 0.08)')}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = index % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)';
+                    }}
+                  >
+                    {/* 股票名称 */}
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span style={{ fontWeight: 600, fontSize: '14px' }}>{stock.name}</span>
+                        <span style={{ fontSize: '12px', color: 'var(--muted)' }}>{stock.code}</span>
+                      </div>
+                    </td>
+
+                    {/* 最新价 */}
+                    <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                      {priceData ? (
+                        <span style={{ fontWeight: 600, fontSize: '14px' }}>
+                          ¥{priceData.price.toFixed(2)}
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--muted)', fontSize: '12px' }}>
+                          -
+                        </span>
+                      )}
+                    </td>
+
+                    {/* 涨跌幅 */}
+                    <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                      {priceData ? (
+                        <span style={{
+                          fontWeight: 600,
+                          fontSize: '14px',
+                          color: getChangeColor(priceData.change)
+                        }}>
+                          {priceData.change > 0 ? '+' : ''}{priceData.change.toFixed(2)}%
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--muted)', fontSize: '12px' }}>-</span>
+                      )}
+                    </td>
+
+                    {/* 重仓基金数 */}
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '4px 10px',
+                        borderRadius: '12px',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        background: isMultiFund ? 'rgba(34,197,94,0.2)' : 'rgba(245,158,11,0.2)',
+                        color: isMultiFund ? '#22c55e' : '#f59e0b'
+                      }}>
+                        {stock.funds.length} 只
+                      </span>
+                    </td>
+
+                    {/* 基金持仓明细 */}
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {stock.funds.map((fund, idx) => (
+                          <div
+                            key={fund.code}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              fontSize: '12px',
+                              background: 'rgba(255,255,255,0.05)',
+                              border: '1px solid var(--border)'
+                            }}
+                          >
+                            <span style={{ fontWeight: 500 }}>
+                              {fund.name.length > 12 ? fund.name.slice(0, 12) + '...' : fund.name}
+                            </span>
+                            <span style={{
+                              color: fund.ratio > 5 ? '#ef4444' : fund.ratio > 3 ? '#f59e0b' : 'var(--muted)',
+                              fontWeight: 600,
+                              fontSize: '11px'
+                            }}>
+                              持仓 {fund.ratio.toFixed(2)}%
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {holdingsUnion.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--muted)' }}>
+            <GridIcon width="48" height="48" style={{ opacity: 0.3, marginBottom: 16 }} />
+            <p style={{ fontSize: '16px', fontWeight: 500, marginBottom: 8 }}>暂无持仓数据</p>
+            <p style={{ fontSize: '13px', marginBottom: 16 }}>
+              {funds.length === 0 
+                ? '您还没有添加任何基金' 
+                : funds.every(f => !f.holdings || f.holdings.length === 0)
+                  ? `您添加了 ${funds.length} 只基金，但都没有获取到持仓数据`
+                  : '持仓数据正在加载中...'}
+            </p>
+            {funds.length > 0 && funds.every(f => !f.holdings || f.holdings.length === 0) && (
+              <div style={{ 
+                background: 'rgba(255,255,255,0.05)', 
+                padding: '16px', 
+                borderRadius: '8px', 
+                fontSize: '12px',
+                textAlign: 'left',
+                maxWidth: '400px',
+                margin: '0 auto'
+              }}>
+                <p style={{ marginBottom: '8px', fontWeight: 500 }}>可能的原因：</p>
+                <ul style={{ paddingLeft: '16px', lineHeight: '1.8' }}>
+                  <li>基金是新添加的，持仓数据尚未加载完成</li>
+                  <li>网络问题导致无法获取持仓数据</li>
+                  <li>基金代码错误或该基金暂无持仓披露</li>
+                </ul>
+                <p style={{ marginTop: '12px' }}>建议：刷新页面或重新添加基金</p>
+              </div>
+            )}
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -2368,8 +3597,15 @@ export default function HomePage() {
 
   // 刷新频率状态
   const [refreshMs, setRefreshMs] = useState(30000);
+  const [refreshDropdownOpen, setRefreshDropdownOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [tempSeconds, setTempSeconds] = useState(30);
+
+  // 持仓并集弹窗状态
+  const [holdingsUnionModalOpen, setHoldingsUnionModalOpen] = useState(false);
+
+  // 股票汇总弹窗状态
+  const [stockListModal, setStockListModal] = useState({ open: false, loading: false, data: null });
 
   // 全局刷新状态
   const [refreshing, setRefreshing] = useState(false);
@@ -2414,6 +3650,232 @@ export default function HomePage() {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackNonce, setFeedbackNonce] = useState(0);
   const [weChatOpen, setWeChatOpen] = useState(false);
+
+  // 行业分类弹窗状态
+  const [industryModalOpen, setIndustryModalOpen] = useState(false);
+
+  // 锁定背景滚动 - 设置弹框和登录弹框
+  useLockBodyScroll(settingsOpen || loginModalOpen);
+
+  // 自选股弹窗状态
+  const [watchlistModalOpen, setWatchlistModalOpen] = useState(false);
+
+  // 行业分类数据（Wind四级分类）
+  const industryData = useMemo(() => {
+    const data = [
+      // 能源
+      { l1_code: '10', l1_name: '能源', l2_code: '1010', l2_name: '能源', l3_code: '101010', l3_name: '石油与天然气', l4_code: '10101010', l4_name: '石油与天然气的勘探及生产' },
+      { l1_code: '10', l1_name: '能源', l2_code: '1010', l2_name: '能源', l3_code: '101010', l3_name: '石油与天然气', l4_code: '10101020', l4_name: '石油与天然气的炼制与营销' },
+      { l1_code: '10', l1_name: '能源', l2_code: '1010', l2_name: '能源', l3_code: '101010', l3_name: '石油与天然气', l4_code: '10101030', l4_name: '石油与天然气的存储与运输' },
+      { l1_code: '10', l1_name: '能源', l2_code: '1010', l2_name: '能源', l3_code: '101020', l3_name: '煤炭', l4_code: '10102010', l4_name: '煤炭开采' },
+      { l1_code: '10', l1_name: '能源', l2_code: '1010', l2_name: '能源', l3_code: '101020', l3_name: '煤炭', l4_code: '10102020', l4_name: '煤炭加工' },
+      { l1_code: '10', l1_name: '能源', l2_code: '1020', l2_name: '能源设备与服务', l3_code: '102010', l3_name: '石油与天然气设备与服务', l4_code: '10201010', l4_name: '石油与天然气钻井设备与服务' },
+      { l1_code: '10', l1_name: '能源', l2_code: '1020', l2_name: '能源设备与服务', l3_code: '102010', l3_name: '石油与天然气设备与服务', l4_code: '10201020', l4_name: '石油与天然气设备' },
+      { l1_code: '10', l1_name: '能源', l2_code: '1020', l2_name: '能源设备与服务', l3_code: '102010', l3_name: '石油与天然气设备与服务', l4_code: '10201030', l4_name: '油田服务' },
+      { l1_code: '10', l1_name: '能源', l2_code: '1020', l2_name: '能源设备与服务', l3_code: '102020', l3_name: '新能源设备', l4_code: '10202010', l4_name: '风电设备' },
+      { l1_code: '10', l1_name: '能源', l2_code: '1020', l2_name: '能源设备与服务', l3_code: '102020', l3_name: '新能源设备', l4_code: '10202020', l4_name: '光伏设备' },
+      { l1_code: '10', l1_name: '能源', l2_code: '1020', l2_name: '能源设备与服务', l3_code: '102020', l3_name: '新能源设备', l4_code: '10202030', l4_name: '储能设备' },
+      // 材料
+      { l1_code: '15', l1_name: '材料', l2_code: '1510', l2_name: '材料', l3_code: '151010', l3_name: '化工', l4_code: '15101010', l4_name: '石油化工' },
+      { l1_code: '15', l1_name: '材料', l2_code: '1510', l2_name: '材料', l3_code: '151010', l3_name: '化工', l4_code: '15101020', l4_name: '化学原料' },
+      { l1_code: '15', l1_name: '材料', l2_code: '1510', l2_name: '材料', l3_code: '151010', l3_name: '化工', l4_code: '15101030', l4_name: '化学制品' },
+      { l1_code: '15', l1_name: '材料', l2_code: '1510', l2_name: '材料', l3_code: '151010', l3_name: '化工', l4_code: '15101040', l4_name: '塑料橡胶' },
+      { l1_code: '15', l1_name: '材料', l2_code: '1510', l2_name: '材料', l3_code: '151020', l3_name: '建材', l4_code: '15102010', l4_name: '水泥' },
+      { l1_code: '15', l1_name: '材料', l2_code: '1510', l2_name: '材料', l3_code: '151020', l3_name: '建材', l4_code: '15102020', l4_name: '玻璃' },
+      { l1_code: '15', l1_name: '材料', l2_code: '1510', l2_name: '材料', l3_code: '151020', l3_name: '建材', l4_code: '15102030', l4_name: '其他建材' },
+      { l1_code: '15', l1_name: '材料', l2_code: '1510', l2_name: '材料', l3_code: '151030', l3_name: '金属与非金属', l4_code: '15103010', l4_name: '钢铁' },
+      { l1_code: '15', l1_name: '材料', l2_code: '1510', l2_name: '材料', l3_code: '151030', l3_name: '金属与非金属', l4_code: '15103020', l4_name: '有色金属' },
+      { l1_code: '15', l1_name: '材料', l2_code: '1510', l2_name: '材料', l3_code: '151030', l3_name: '金属与非金属', l4_code: '15103030', l4_name: '黄金' },
+      { l1_code: '15', l1_name: '材料', l2_code: '1510', l2_name: '材料', l3_code: '151030', l3_name: '金属与非金属', l4_code: '15103040', l4_name: '其他金属' },
+      { l1_code: '15', l1_name: '材料', l2_code: '1510', l2_name: '材料', l3_code: '151030', l3_name: '金属与非金属', l4_code: '15103050', l4_name: '非金属矿' },
+      { l1_code: '15', l1_name: '材料', l2_code: '1510', l2_name: '材料', l3_code: '151040', l3_name: '造纸与包装', l4_code: '15104010', l4_name: '造纸' },
+      { l1_code: '15', l1_name: '材料', l2_code: '1510', l2_name: '材料', l3_code: '151040', l3_name: '造纸与包装', l4_code: '15104020', l4_name: '包装' },
+      // 工业
+      { l1_code: '20', l1_name: '工业', l2_code: '2010', l2_name: '资本货物', l3_code: '201010', l3_name: '航空航天与国防', l4_code: '20101010', l4_name: '航天航空' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2010', l2_name: '资本货物', l3_code: '201010', l3_name: '航空航天与国防', l4_code: '20101020', l4_name: '国防军工' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2010', l2_name: '资本货物', l3_code: '201020', l3_name: '建筑与工程', l4_code: '20102010', l4_name: '房屋建设' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2010', l2_name: '资本货物', l3_code: '201020', l3_name: '建筑与工程', l4_code: '20102020', l4_name: '基础建设' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2010', l2_name: '资本货物', l3_code: '201020', l3_name: '建筑与工程', l4_code: '20102030', l4_name: '装修装饰' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2010', l2_name: '资本货物', l3_code: '201020', l3_name: '建筑与工程', l4_code: '20102040', l4_name: '工程咨询服务' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2010', l2_name: '资本货物', l3_code: '201030', l3_name: '建筑产品', l4_code: '20103010', l4_name: '钢结构' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2010', l2_name: '资本货物', l3_code: '201030', l3_name: '建筑产品', l4_code: '20103020', l4_name: '其他建筑产品' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2010', l2_name: '资本货物', l3_code: '201040', l3_name: '重型机械', l4_code: '20104010', l4_name: '工程机械' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2010', l2_name: '资本货物', l3_code: '201040', l3_name: '重型机械', l4_code: '20104020', l4_name: '重型机械' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2010', l2_name: '资本货物', l3_code: '201050', l3_name: '贸易公司与经销商', l4_code: '20105010', l4_name: '贸易公司' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2010', l2_name: '资本货物', l3_code: '201050', l3_name: '贸易公司与经销商', l4_code: '20105020', l4_name: '经销商' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2010', l2_name: '资本货物', l3_code: '201060', l3_name: '电气设备', l4_code: '20106010', l4_name: '电机' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2010', l2_name: '资本货物', l3_code: '201060', l3_name: '电气设备', l4_code: '20106020', l4_name: '输变电设备' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2010', l2_name: '资本货物', l3_code: '201060', l3_name: '电气设备', l4_code: '20106030', l4_name: '电力电子设备' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2010', l2_name: '资本货物', l3_code: '201070', l3_name: '工业机械', l4_code: '20107010', l4_name: '仪器仪表' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2010', l2_name: '资本货物', l3_code: '201070', l3_name: '工业机械', l4_code: '20107020', l4_name: '通用机械' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2010', l2_name: '资本货物', l3_code: '201070', l3_name: '工业机械', l4_code: '20107030', l4_name: '专用机械' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2020', l2_name: '商业服务与商业用品', l3_code: '202010', l3_name: '商业服务', l4_code: '20201010', l4_name: '人力资源服务' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2020', l2_name: '商业服务与商业用品', l3_code: '202010', l3_name: '商业服务', l4_code: '20201020', l4_name: '检测认证服务' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2020', l2_name: '商业服务与商业用品', l3_code: '202010', l3_name: '商业服务', l4_code: '20201030', l4_name: '其他商业服务' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2020', l2_name: '商业服务与商业用品', l3_code: '202020', l3_name: '商业用品', l4_code: '20202010', l4_name: '办公用品' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2020', l2_name: '商业服务与商业用品', l3_code: '202020', l3_name: '商业用品', l4_code: '20202020', l4_name: '其他商业用品' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2030', l2_name: '运输', l3_code: '203010', l3_name: '航空货运与物流', l4_code: '20301010', l4_name: '航空货运' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2030', l2_name: '运输', l3_code: '203010', l3_name: '航空货运与物流', l4_code: '20301020', l4_name: '物流' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2030', l2_name: '运输', l3_code: '203020', l3_name: '航空公司', l4_code: '20302010', l4_name: '航空公司' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2030', l2_name: '运输', l3_code: '203030', l3_name: '海运', l4_code: '20303010', l4_name: '海运' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2030', l2_name: '运输', l3_code: '203040', l3_name: '公路与铁路运输', l4_code: '20304010', l4_name: '公路运输' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2030', l2_name: '运输', l3_code: '203040', l3_name: '公路与铁路运输', l4_code: '20304020', l4_name: '铁路运输' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2030', l2_name: '运输', l3_code: '203050', l3_name: '交通基础设施', l4_code: '20305010', l4_name: '机场' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2030', l2_name: '运输', l3_code: '203050', l3_name: '交通基础设施', l4_code: '20305020', l4_name: '港口' },
+      { l1_code: '20', l1_name: '工业', l2_code: '2030', l2_name: '运输', l3_code: '203050', l3_name: '交通基础设施', l4_code: '20305030', l4_name: '高速公路' },
+      // 可选消费
+      { l1_code: '25', l1_name: '可选消费', l2_code: '2510', l2_name: '汽车与汽车零部件', l3_code: '251010', l3_name: '汽车', l4_code: '25101010', l4_name: '乘用车' },
+      { l1_code: '25', l1_name: '可选消费', l2_code: '2510', l2_name: '汽车与汽车零部件', l3_code: '251010', l3_name: '汽车', l4_code: '25101020', l4_name: '商用车' },
+      { l1_code: '25', l1_name: '可选消费', l2_code: '2510', l2_name: '汽车与汽车零部件', l3_code: '251010', l3_name: '汽车', l4_code: '25101030', l4_name: '新能源汽车' },
+      { l1_code: '25', l1_name: '可选消费', l2_code: '2510', l2_name: '汽车与汽车零部件', l3_code: '251020', l3_name: '汽车零部件', l4_code: '25102010', l4_name: '汽车零部件' },
+      { l1_code: '25', l1_name: '可选消费', l2_code: '2510', l2_name: '汽车与汽车零部件', l3_code: '251020', l3_name: '汽车零部件', l4_code: '25102020', l4_name: '轮胎' },
+      { l1_code: '25', l1_name: '可选消费', l2_code: '2520', l2_name: '耐用消费品与服装', l3_code: '252010', l3_name: '家居装饰', l4_code: '25201010', l4_name: '家居装饰' },
+      { l1_code: '25', l1_name: '可选消费', l2_code: '2520', l2_name: '耐用消费品与服装', l3_code: '252020', l3_name: '家用电器', l4_code: '25202010', l4_name: '白电' },
+      { l1_code: '25', l1_name: '可选消费', l2_code: '2520', l2_name: '耐用消费品与服装', l3_code: '252020', l3_name: '家用电器', l4_code: '25202020', l4_name: '黑电' },
+      { l1_code: '25', l1_name: '可选消费', l2_code: '2520', l2_name: '耐用消费品与服装', l3_code: '252020', l3_name: '家用电器', l4_code: '25202030', l4_name: '小家电' },
+      { l1_code: '25', l1_name: '可选消费', l2_code: '2520', l2_name: '耐用消费品与服装', l3_code: '252030', l3_name: '消费电子产品', l4_code: '25203010', l4_name: '消费电子' },
+      { l1_code: '25', l1_name: '可选消费', l2_code: '2520', l2_name: '耐用消费品与服装', l3_code: '252040', l3_name: '家庭耐用消费品', l4_code: '25204010', l4_name: '厨房电器' },
+      { l1_code: '25', l1_name: '可选消费', l2_code: '2520', l2_name: '耐用消费品与服装', l3_code: '252040', l3_name: '家庭耐用消费品', l4_code: '25204020', l4_name: '其他家庭耐用消费品' },
+      { l1_code: '25', l1_name: '可选消费', l2_code: '2520', l2_name: '耐用消费品与服装', l3_code: '252050', l3_name: '休闲设备与用品', l4_code: '25205010', l4_name: '休闲设备' },
+      { l1_code: '25', l1_name: '可选消费', l2_code: '2520', l2_name: '耐用消费品与服装', l3_code: '252050', l3_name: '休闲设备与用品', l4_code: '25205020', l4_name: '休闲用品' },
+      { l1_code: '25', l1_name: '可选消费', l2_code: '2520', l2_name: '耐用消费品与服装', l3_code: '252060', l3_name: '纺织、服装与奢侈品', l4_code: '25206010', l4_name: '纺织' },
+      { l1_code: '25', l1_name: '可选消费', l2_code: '2520', l2_name: '耐用消费品与服装', l3_code: '252060', l3_name: '纺织、服装与奢侈品', l4_code: '25206020', l4_name: '服装' },
+      { l1_code: '25', l1_name: '可选消费', l2_code: '2520', l2_name: '耐用消费品与服装', l3_code: '252060', l3_name: '纺织、服装与奢侈品', l4_code: '25206030', l4_name: '奢侈品' },
+      { l1_code: '25', l1_name: '可选消费', l2_code: '2530', l2_name: '消费者服务', l3_code: '253010', l3_name: '酒店、餐馆与休闲', l4_code: '25301010', l4_name: '酒店' },
+      { l1_code: '25', l1_name: '可选消费', l2_code: '2530', l2_name: '消费者服务', l3_code: '253010', l3_name: '酒店、餐馆与休闲', l4_code: '25301020', l4_name: '餐饮' },
+      { l1_code: '25', l1_name: '可选消费', l2_code: '2530', l2_name: '消费者服务', l3_code: '253010', l3_name: '酒店、餐馆与休闲', l4_code: '25301030', l4_name: '旅游服务' },
+      { l1_code: '25', l1_name: '可选消费', l2_code: '2530', l2_name: '消费者服务', l3_code: '253020', l3_name: '综合消费者服务', l4_code: '25302010', l4_name: '教育服务' },
+      { l1_code: '25', l1_name: '可选消费', l2_code: '2530', l2_name: '消费者服务', l3_code: '253020', l3_name: '综合消费者服务', l4_code: '25302020', l4_name: '其他消费者服务' },
+      { l1_code: '25', l1_name: '可选消费', l2_code: '2540', l2_name: '零售业', l3_code: '254010', l3_name: '百货商店', l4_code: '25401010', l4_name: '百货商店' },
+      { l1_code: '25', l1_name: '可选消费', l2_code: '2540', l2_name: '零售业', l3_code: '254020', l3_name: '互联网零售', l4_code: '25402010', l4_name: '互联网零售' },
+      { l1_code: '25', l1_name: '可选消费', l2_code: '2540', l2_name: '零售业', l3_code: '254030', l3_name: '专卖店', l4_code: '25403010', l4_name: '专卖店' },
+      { l1_code: '25', l1_name: '可选消费', l2_code: '2540', l2_name: '零售业', l3_code: '254040', l3_name: '综合零售商', l4_code: '25404010', l4_name: '综合零售商' },
+      // 必需消费
+      { l1_code: '30', l1_name: '必需消费', l2_code: '3010', l2_name: '食品与主要用品零售', l3_code: '301010', l3_name: '大卖场与超市', l4_code: '30101010', l4_name: '大卖场' },
+      { l1_code: '30', l1_name: '必需消费', l2_code: '3010', l2_name: '食品与主要用品零售', l3_code: '301010', l3_name: '大卖场与超市', l4_code: '30101020', l4_name: '超市' },
+      { l1_code: '30', l1_name: '必需消费', l2_code: '3010', l2_name: '食品与主要用品零售', l3_code: '301020', l3_name: '食品分销商', l4_code: '30102010', l4_name: '食品分销商' },
+      { l1_code: '30', l1_name: '必需消费', l2_code: '3010', l2_name: '食品与主要用品零售', l3_code: '301030', l3_name: '食品零售', l4_code: '30103010', l4_name: '食品零售' },
+      { l1_code: '30', l1_name: '必需消费', l2_code: '3020', l2_name: '食品、饮料与烟草', l3_code: '302010', l3_name: '酒类', l4_code: '30201010', l4_name: '白酒' },
+      { l1_code: '30', l1_name: '必需消费', l2_code: '3020', l2_name: '食品、饮料与烟草', l3_code: '302010', l3_name: '酒类', l4_code: '30201020', l4_name: '啤酒' },
+      { l1_code: '30', l1_name: '必需消费', l2_code: '3020', l2_name: '食品、饮料与烟草', l3_code: '302010', l3_name: '酒类', l4_code: '30201030', l4_name: '葡萄酒' },
+      { l1_code: '30', l1_name: '必需消费', l2_code: '3020', l2_name: '食品、饮料与烟草', l3_code: '302020', l3_name: '软饮料', l4_code: '30202010', l4_name: '软饮料' },
+      { l1_code: '30', l1_name: '必需消费', l2_code: '3020', l2_name: '食品、饮料与烟草', l3_code: '302030', l3_name: '食品加工', l4_code: '30203010', l4_name: '肉制品' },
+      { l1_code: '30', l1_name: '必需消费', l2_code: '3020', l2_name: '食品、饮料与烟草', l3_code: '302030', l3_name: '食品加工', l4_code: '30203020', l4_name: '调味品' },
+      { l1_code: '30', l1_name: '必需消费', l2_code: '3020', l2_name: '食品、饮料与烟草', l3_code: '302030', l3_name: '食品加工', l4_code: '30203030', l4_name: '乳制品' },
+      { l1_code: '30', l1_name: '必需消费', l2_code: '3020', l2_name: '食品、饮料与烟草', l3_code: '302030', l3_name: '食品加工', l4_code: '30203040', l4_name: '其他食品加工' },
+      { l1_code: '30', l1_name: '必需消费', l2_code: '3020', l2_name: '食品、饮料与烟草', l3_code: '302040', l3_name: '农产品', l4_code: '30204010', l4_name: '种植' },
+      { l1_code: '30', l1_name: '必需消费', l2_code: '3020', l2_name: '食品、饮料与烟草', l3_code: '302040', l3_name: '农产品', l4_code: '30204020', l4_name: '养殖' },
+      { l1_code: '30', l1_name: '必需消费', l2_code: '3020', l2_name: '食品、饮料与烟草', l3_code: '302040', l3_name: '农产品', l4_code: '30204030', l4_name: '水产养殖' },
+      { l1_code: '30', l1_name: '必需消费', l2_code: '3020', l2_name: '食品、饮料与烟草', l3_code: '302050', l3_name: '烟草', l4_code: '30205010', l4_name: '烟草' },
+      { l1_code: '30', l1_name: '必需消费', l2_code: '3030', l2_name: '家庭与个人用品', l3_code: '303010', l3_name: '家居用品', l4_code: '30301010', l4_name: '家居用品' },
+      { l1_code: '30', l1_name: '必需消费', l2_code: '3030', l2_name: '家庭与个人用品', l3_code: '303020', l3_name: '个人用品', l4_code: '30302010', l4_name: '化妆品' },
+      { l1_code: '30', l1_name: '必需消费', l2_code: '3030', l2_name: '家庭与个人用品', l3_code: '303020', l3_name: '个人用品', l4_code: '30302020', l4_name: '日化用品' },
+      // 医疗保健
+      { l1_code: '35', l1_name: '医疗保健', l2_code: '3510', l2_name: '医疗保健设备与服务', l3_code: '351010', l3_name: '医疗保健设备', l4_code: '35101010', l4_name: '医疗设备' },
+      { l1_code: '35', l1_name: '医疗保健', l2_code: '3510', l2_name: '医疗保健设备与服务', l3_code: '351010', l3_name: '医疗保健设备', l4_code: '35101020', l4_name: '医疗器械' },
+      { l1_code: '35', l1_name: '医疗保健', l2_code: '3510', l2_name: '医疗保健设备与服务', l3_code: '351020', l3_name: '医疗保健用品', l4_code: '35102010', l4_name: '医疗耗材' },
+      { l1_code: '35', l1_name: '医疗保健', l2_code: '3510', l2_name: '医疗保健设备与服务', l3_code: '351020', l3_name: '医疗保健用品', l4_code: '35102020', l4_name: '诊断试剂' },
+      { l1_code: '35', l1_name: '医疗保健', l2_code: '3510', l2_name: '医疗保健设备与服务', l3_code: '351030', l3_name: '医疗保健服务', l4_code: '35103010', l4_name: '医院' },
+      { l1_code: '35', l1_name: '医疗保健', l2_code: '3510', l2_name: '医疗保健设备与服务', l3_code: '351030', l3_name: '医疗保健服务', l4_code: '35103020', l4_name: '诊断服务' },
+      { l1_code: '35', l1_name: '医疗保健', l2_code: '3510', l2_name: '医疗保健设备与服务', l3_code: '351040', l3_name: '医疗保健技术', l4_code: '35104010', l4_name: '医疗信息化' },
+      { l1_code: '35', l1_name: '医疗保健', l2_code: '3520', l2_name: '制药、生物科技与生命科学', l3_code: '352010', l3_name: '生物科技', l4_code: '35201010', l4_name: '生物制品' },
+      { l1_code: '35', l1_name: '医疗保健', l2_code: '3520', l2_name: '制药、生物科技与生命科学', l3_code: '352010', l3_name: '生物科技', l4_code: '35201020', l4_name: '疫苗' },
+      { l1_code: '35', l1_name: '医疗保健', l2_code: '3520', l2_name: '制药、生物科技与生命科学', l3_code: '352020', l3_name: '化学制药', l4_code: '35202010', l4_name: '化学原料药' },
+      { l1_code: '35', l1_name: '医疗保健', l2_code: '3520', l2_name: '制药、生物科技与生命科学', l3_code: '352020', l3_name: '化学制药', l4_code: '35202020', l4_name: '化学制剂' },
+      { l1_code: '35', l1_name: '医疗保健', l2_code: '3520', l2_name: '制药、生物科技与生命科学', l3_code: '352030', l3_name: '中药', l4_code: '35203010', l4_name: '中药' },
+      // 金融
+      { l1_code: '40', l1_name: '金融', l2_code: '4010', l2_name: '银行', l3_code: '401010', l3_name: '银行', l4_code: '40101010', l4_name: '国有大型银行' },
+      { l1_code: '40', l1_name: '金融', l2_code: '4010', l2_name: '银行', l3_code: '401010', l3_name: '银行', l4_code: '40101020', l4_name: '股份制银行' },
+      { l1_code: '40', l1_name: '金融', l2_code: '4010', l2_name: '银行', l3_code: '401010', l3_name: '银行', l4_code: '40101030', l4_name: '城商行' },
+      { l1_code: '40', l1_name: '金融', l2_code: '4010', l2_name: '银行', l3_code: '401010', l3_name: '银行', l4_code: '40101040', l4_name: '农商行' },
+      { l1_code: '40', l1_name: '金融', l2_code: '4020', l2_name: '多元化金融', l3_code: '402010', l3_name: '资产管理', l4_code: '40201010', l4_name: '基金管理' },
+      { l1_code: '40', l1_name: '金融', l2_code: '4020', l2_name: '多元化金融', l3_code: '402010', l3_name: '资产管理', l4_code: '40201020', l4_name: '资产管理' },
+      { l1_code: '40', l1_name: '金融', l2_code: '4020', l2_name: '多元化金融', l3_code: '402020', l3_name: '投资银行与经纪', l4_code: '40202010', l4_name: '证券公司' },
+      { l1_code: '40', l1_name: '金融', l2_code: '4020', l2_name: '多元化金融', l3_code: '402030', l3_name: '金融租赁', l4_code: '40203010', l4_name: '金融租赁' },
+      { l1_code: '40', l1_name: '金融', l2_code: '4020', l2_name: '多元化金融', l3_code: '402040', l3_name: '其他多元化金融服务', l4_code: '40204010', l4_name: '信托' },
+      { l1_code: '40', l1_name: '金融', l2_code: '4020', l2_name: '多元化金融', l3_code: '402040', l3_name: '其他多元化金融服务', l4_code: '40204020', l4_name: '小贷' },
+      { l1_code: '40', l1_name: '金融', l2_code: '4020', l2_name: '多元化金融', l3_code: '402050', l3_name: '消费信贷', l4_code: '40205010', l4_name: '消费金融' },
+      { l1_code: '40', l1_name: '金融', l2_code: '4020', l2_name: '多元化金融', l3_code: '402060', l3_name: '资本市场服务', l4_code: '40206010', l4_name: '投资管理' },
+      { l1_code: '40', l1_name: '金融', l2_code: '4030', l2_name: '保险', l3_code: '403010', l3_name: '保险', l4_code: '40301010', l4_name: '人寿保险' },
+      { l1_code: '40', l1_name: '金融', l2_code: '4030', l2_name: '保险', l3_code: '403010', l3_name: '保险', l4_code: '40301020', l4_name: '财产保险' },
+      { l1_code: '40', l1_name: '金融', l2_code: '4030', l2_name: '保险', l3_code: '403010', l3_name: '保险', l4_code: '40301030', l4_name: '再保险' },
+      { l1_code: '40', l1_name: '金融', l2_code: '4040', l2_name: '房地产', l3_code: '404010', l3_name: '房地产开发', l4_code: '40401010', l4_name: '房地产开发' },
+      { l1_code: '40', l1_name: '金融', l2_code: '4040', l2_name: '房地产', l3_code: '404020', l3_name: '房地产管理', l4_code: '40402010', l4_name: '物业管理' },
+      { l1_code: '40', l1_name: '金融', l2_code: '4040', l2_name: '房地产', l3_code: '404030', l3_name: '房地产投资信托', l4_code: '40403010', l4_name: '房地产投资信托' },
+      // 信息技术
+      { l1_code: '45', l1_name: '信息技术', l2_code: '4510', l2_name: '软件与服务', l3_code: '451010', l3_name: '互联网软件与服务', l4_code: '45101010', l4_name: '互联网服务' },
+      { l1_code: '45', l1_name: '信息技术', l2_code: '4510', l2_name: '软件与服务', l3_code: '451010', l3_name: '互联网软件与服务', l4_code: '45101020', l4_name: '云计算服务' },
+      { l1_code: '45', l1_name: '信息技术', l2_code: '4510', l2_name: '软件与服务', l3_code: '451020', l3_name: '应用软件', l4_code: '45102010', l4_name: '办公软件' },
+      { l1_code: '45', l1_name: '信息技术', l2_code: '4510', l2_name: '软件与服务', l3_code: '451020', l3_name: '应用软件', l4_code: '45102020', l4_name: '行业应用软件' },
+      { l1_code: '45', l1_name: '信息技术', l2_code: '4510', l2_name: '软件与服务', l3_code: '451030', l3_name: '系统软件', l4_code: '45103010', l4_name: '操作系统' },
+      { l1_code: '45', l1_name: '信息技术', l2_code: '4510', l2_name: '软件与服务', l3_code: '451030', l3_name: '系统软件', l4_code: '45103020', l4_name: '数据库软件' },
+      { l1_code: '45', l1_name: '信息技术', l2_code: '4510', l2_name: '软件与服务', l3_code: '451040', l3_name: '信息技术服务', l4_code: '45104010', l4_name: 'IT服务' },
+      { l1_code: '45', l1_name: '信息技术', l2_code: '4520', l2_name: '技术硬件与设备', l3_code: '452010', l3_name: '电脑与外围设备', l4_code: '45201010', l4_name: '电脑' },
+      { l1_code: '45', l1_name: '信息技术', l2_code: '4520', l2_name: '技术硬件与设备', l3_code: '452010', l3_name: '电脑与外围设备', l4_code: '45201020', l4_name: '外围设备' },
+      { l1_code: '45', l1_name: '信息技术', l2_code: '4520', l2_name: '技术硬件与设备', l3_code: '452020', l3_name: '电子设备、仪器和元件', l4_code: '45202010', l4_name: '电子元器件' },
+      { l1_code: '45', l1_name: '信息技术', l2_code: '4520', l2_name: '技术硬件与设备', l3_code: '452020', l3_name: '电子设备、仪器和元件', l4_code: '45202020', l4_name: '电子仪器' },
+      { l1_code: '45', l1_name: '信息技术', l2_code: '4520', l2_name: '技术硬件与设备', l3_code: '452030', l3_name: '办公电子设备', l4_code: '45203010', l4_name: '办公电子设备' },
+      { l1_code: '45', l1_name: '信息技术', l2_code: '4520', l2_name: '技术硬件与设备', l3_code: '452040', l3_name: '半导体与半导体设备', l4_code: '45204010', l4_name: '半导体设计' },
+      { l1_code: '45', l1_name: '信息技术', l2_code: '4520', l2_name: '技术硬件与设备', l3_code: '452040', l3_name: '半导体与半导体设备', l4_code: '45204020', l4_name: '半导体制造' },
+      { l1_code: '45', l1_name: '信息技术', l2_code: '4520', l2_name: '技术硬件与设备', l3_code: '452040', l3_name: '半导体与半导体设备', l4_code: '45204030', l4_name: '半导体设备' },
+      { l1_code: '45', l1_name: '信息技术', l2_code: '4520', l2_name: '技术硬件与设备', l3_code: '452050', l3_name: '电子元件', l4_code: '45205010', l4_name: '被动元件' },
+      { l1_code: '45', l1_name: '信息技术', l2_code: '4520', l2_name: '技术硬件与设备', l3_code: '452050', l3_name: '电子元件', l4_code: '45205020', l4_name: '印制电路板' },
+      // 电信服务
+      { l1_code: '50', l1_name: '电信服务', l2_code: '5010', l2_name: '电信服务', l3_code: '501010', l3_name: '电信运营', l4_code: '50101010', l4_name: '电信运营' },
+      { l1_code: '50', l1_name: '电信服务', l2_code: '5010', l2_name: '电信服务', l3_code: '501020', l3_name: '电信增值服务', l4_code: '50102010', l4_name: '电信增值服务' },
+      // 公用事业
+      { l1_code: '55', l1_name: '公用事业', l2_code: '5510', l2_name: '公用事业', l3_code: '551010', l3_name: '电力', l4_code: '55101010', l4_name: '火电' },
+      { l1_code: '55', l1_name: '公用事业', l2_code: '5510', l2_name: '公用事业', l3_code: '551010', l3_name: '电力', l4_code: '55101020', l4_name: '水电' },
+      { l1_code: '55', l1_name: '公用事业', l2_code: '5510', l2_name: '公用事业', l3_code: '551010', l3_name: '电力', l4_code: '55101030', l4_name: '核电' },
+      { l1_code: '55', l1_name: '公用事业', l2_code: '5510', l2_name: '公用事业', l3_code: '551010', l3_name: '电力', l4_code: '55101040', l4_name: '新能源发电' },
+      { l1_code: '55', l1_name: '公用事业', l2_code: '5510', l2_name: '公用事业', l3_code: '551020', l3_name: '燃气', l4_code: '55102010', l4_name: '燃气' },
+      { l1_code: '55', l1_name: '公用事业', l2_code: '5510', l2_name: '公用事业', l3_code: '551030', l3_name: '水务', l4_code: '55103010', l4_name: '水务' },
+      { l1_code: '55', l1_name: '公用事业', l2_code: '5510', l2_name: '公用事业', l3_code: '551040', l3_name: '环保服务', l4_code: '55104010', l4_name: '环境治理' },
+      { l1_code: '55', l1_name: '公用事业', l2_code: '5510', l2_name: '公用事业', l3_code: '551040', l3_name: '环保服务', l4_code: '55104020', l4_name: '固废处理' },
+      // 房地产
+      { l1_code: '60', l1_name: '房地产', l2_code: '6010', l2_name: '房地产', l3_code: '601010', l3_name: '房地产开发', l4_code: '60101010', l4_name: '住宅开发' },
+      { l1_code: '60', l1_name: '房地产', l2_code: '6010', l2_name: '房地产', l3_code: '601010', l3_name: '房地产开发', l4_code: '60101020', l4_name: '商业地产开发' },
+      { l1_code: '60', l1_name: '房地产', l2_code: '6010', l2_name: '房地产', l3_code: '601020', l3_name: '房地产服务', l4_code: '60102010', l4_name: '房地产中介' },
+      { l1_code: '60', l1_name: '房地产', l2_code: '6010', l2_name: '房地产', l3_code: '601020', l3_name: '房地产服务', l4_code: '60102020', l4_name: '物业管理' },
+      { l1_code: '60', l1_name: '房地产', l2_code: '6020', l2_name: '房地产投资信托', l3_code: '602010', l3_name: '房地产投资信托', l4_code: '60201010', l4_name: '商业地产REITs' },
+      { l1_code: '60', l1_name: '房地产', l2_code: '6020', l2_name: '房地产投资信托', l3_code: '602010', l3_name: '房地产投资信托', l4_code: '60201020', l4_name: '住宅REITs' },
+    ];
+
+    // 构建层级结构
+    const l1Set = new Map();
+    const l2Set = new Set();
+    const l3Set = new Set();
+
+    data.forEach(item => {
+      if (!l1Set.has(item.l1_code)) {
+        l1Set.set(item.l1_code, { code: item.l1_code, name: item.l1_name, l2: new Map() });
+      }
+      const l1Item = l1Set.get(item.l1_code);
+
+      const l2Key = `${item.l1_code}-${item.l2_code}`;
+      l2Set.add(l2Key);
+      if (!l1Item.l2.has(l2Key)) {
+        l1Item.l2.set(l2Key, { code: item.l2_code, name: item.l2_name, l3: new Map() });
+      }
+      const l2Item = l1Item.l2.get(l2Key);
+
+      const l3Key = `${item.l1_code}-${item.l2_code}-${item.l3_code}`;
+      l3Set.add(l3Key);
+      if (!l2Item.l3.has(l3Key)) {
+        l2Item.l3.set(l3Key, { code: item.l3_code, name: item.l3_name, l4: [] });
+      }
+
+      l2Item.l3.get(l3Key).l4.push({ code: item.l4_code, name: item.l4_name });
+    });
+
+    return {
+      l1Count: l1Set.size,
+      l2Count: l2Set.size,
+      l3Count: l3Set.size,
+      l4Count: data.length,
+      tree: Array.from(l1Set.values())
+    };
+  }, []);
 
   // 搜索相关状态
   const [searchTerm, setSearchTerm] = useState('');
@@ -2463,31 +3925,7 @@ export default function HomePage() {
   }, []);
 
   // 检查更新
-  const [hasUpdate, setHasUpdate] = useState(false);
-  const [latestVersion, setLatestVersion] = useState('');
-  const [updateContent, setUpdateContent] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
-
-  useEffect(() => {
-    const checkUpdate = async () => {
-      try {
-        const data = await fetchLatestRelease();
-        if (!data?.tagName) return;
-        const remoteVersion = data.tagName.replace(/^v/, '');
-        if (remoteVersion !== packageJson.version) {
-          setHasUpdate(true);
-          setLatestVersion(remoteVersion);
-          setUpdateContent(data.body || '');
-        }
-      } catch (e) {
-        console.error('Check update failed:', e);
-      }
-    };
-
-    checkUpdate();
-    const interval = setInterval(checkUpdate, 10 * 60 * 1000); // 10 minutes
-    return () => clearInterval(interval);
-  }, []);
 
   // 存储当前被划开的基金代码
   const [swipedFundCode, setSwipedFundCode] = useState(null);
@@ -2864,7 +4302,6 @@ export default function HomePage() {
     window.location.href = '/login';
   };
 
-  const [updateModalOpen, setUpdateModalOpen] = useState(false);
   const [cloudConfigModal, setCloudConfigModal] = useState({ open: false, userId: null });
   const syncDebounceRef = useRef(null);
   const lastSyncedRef = useRef('');
@@ -2988,7 +4425,7 @@ export default function HomePage() {
   const openHistoryModal = async (fund) => {
     setHistoryModal({ open: true, fund, loading: true, data: null });
     try {
-      const res = await fetch(`/api/stocks?fundCode=${fund.code}`);
+      const res = await fetch(`/api/fund-history?code=${fund.code}`);
       const data = await res.json();
       
       // 检查是否有数据
@@ -3032,9 +4469,81 @@ export default function HomePage() {
         return;
       }
       
+      // 自动补充历史持仓股票的历史数据
+      if (data.periods && data.periods.length > 0) {
+        const historyStockCodes = [];
+        data.periods.forEach(period => {
+          if (period.stocks && Array.isArray(period.stocks)) {
+            period.stocks.forEach(stock => {
+              if (stock.stock_code) historyStockCodes.push(stock.stock_code);
+            });
+          }
+        });
+
+        if (historyStockCodes.length > 0) {
+          console.log('正在检查并补充历史持仓股票数据:', historyStockCodes);
+          // 异步调用，不阻塞用户操作
+          fetch('/api/stock-history', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ stockCodes: [...new Set(historyStockCodes)] })
+          }).then(res => res.json()).then(result => {
+            if (result.needCrawl > 0) {
+              console.log(`已补充 ${result.needCrawl} 只历史持仓股票的数据`);
+            }
+          }).catch(err => {
+            console.error('补充历史持仓数据失败:', err);
+          });
+        }
+      }
+
       setHistoryModal(prev => ({ ...prev, loading: false, data }));
     } catch (err) {
       setHistoryModal(prev => ({ ...prev, loading: false, error: '加载失败' }));
+    }
+  };
+
+  // 打开股票汇总弹窗
+  const openStockListModal = async () => {
+    setStockListModal({ open: true, loading: true, data: null });
+    try {
+      // 获取股票列表
+      const res = await fetch('/api/stock-list');
+      const data = await res.json();
+      
+      if (data.data && data.data.length > 0) {
+        // 获取实时行情（批量）
+        const codes = data.data.map(s => s.stock_code).slice(0, 50); // 最多50个
+        try {
+          const realtimeRes = await fetch(`/api/stock-realtime?codes=${codes.join(',')}`);
+          const realtimeData = await realtimeRes.json();
+          
+          // 合并实时数据
+          if (realtimeData.data) {
+            data.data = data.data.map(stock => {
+              const rt = realtimeData.data[stock.stock_code];
+              if (rt) {
+                return {
+                  ...stock,
+                  latest_price: rt.price,
+                  change_percent: rt.change_percent?.toFixed(2),
+                  total_cap: (rt.total_cap / 1e8).toFixed(2),
+                  float_cap: (rt.float_cap / 1e8).toFixed(2),
+                  pe_ttm: rt.pe_ttm?.toFixed(2),
+                  pb: rt.pb?.toFixed(2)
+                };
+              }
+              return stock;
+            });
+          }
+        } catch (e) {
+          console.error('获取实时行情失败:', e);
+        }
+      }
+      
+      setStockListModal({ open: true, loading: false, data });
+    } catch (err) {
+      setStockListModal({ open: true, loading: false, data: { error: '加载失败' } });
     }
   };
 
@@ -3368,8 +4877,28 @@ export default function HomePage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [userMenuOpen]);
 
+  // 关闭刷新频率下拉菜单（点击外部时）
+  const refreshDropdownRef = useRef(null);
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (refreshDropdownRef.current && !refreshDropdownRef.current.contains(event.target)) {
+        setRefreshDropdownOpen(false);
+      }
+    };
+    if (refreshDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [refreshDropdownOpen]);
+
   useEffect(() => {
     if (timerRef.current) clearInterval(timerRef.current);
+    
+    // 如果刷新频率为0，则停止自动刷新
+    if (refreshMs === 0) {
+      return;
+    }
+    
     timerRef.current = setInterval(() => {
       const codes = Array.from(new Set(funds.map((f) => f.code)));
       if (codes.length) refreshAll(codes);
@@ -3433,6 +4962,32 @@ export default function HomePage() {
         const updated = dedupeByCode([...newFunds, ...funds]);
         setFunds(updated);
         storageHelper.setItem('funds', JSON.stringify(updated));
+
+        // 自动补充新基金持仓股票的历史数据
+        const holdingsCodes = [];
+        newFunds.forEach(fund => {
+          if (fund.holdings && Array.isArray(fund.holdings)) {
+            fund.holdings.forEach(h => {
+              if (h.code) holdingsCodes.push(h.code);
+            });
+          }
+        });
+
+        if (holdingsCodes.length > 0) {
+          console.log('正在检查并补充持仓股票历史数据:', holdingsCodes);
+          // 异步调用，不阻塞用户操作
+          fetch('/api/stock-history', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ stockCodes: holdingsCodes })
+          }).then(res => res.json()).then(data => {
+            if (data.needCrawl > 0) {
+              console.log(`已补充 ${data.needCrawl} 只股票的历史数据`);
+            }
+          }).catch(err => {
+            console.error('补充历史数据失败:', err);
+          });
+        }
       }
 
       setSelectedFunds([]);
@@ -4185,6 +5740,7 @@ export default function HomePage() {
     const isAnyModalOpen =
       settingsOpen ||
       feedbackOpen ||
+      industryModalOpen ||
       addResultOpen ||
       addFundToGroupOpen ||
       groupManageOpen ||
@@ -4199,7 +5755,6 @@ export default function HomePage() {
       tradeModal.open ||
       !!clearConfirm ||
       !!fundDeleteConfirm ||
-      updateModalOpen ||
       weChatOpen;
 
     if (isAnyModalOpen) {
@@ -4214,6 +5769,7 @@ export default function HomePage() {
   }, [
     settingsOpen,
     feedbackOpen,
+    industryModalOpen,
     addResultOpen,
     addFundToGroupOpen,
     groupManageOpen,
@@ -4226,7 +5782,6 @@ export default function HomePage() {
     actionModal.open,
     tradeModal.open,
     clearConfirm,
-    updateModalOpen,
     weChatOpen
   ]);
 
@@ -4267,12 +5822,14 @@ export default function HomePage() {
       <Announcement />
       <div className="navbar glass">
         {refreshing && <div className="loading-bar"></div>}
+        
+        {/* 品牌区域 */}
         <div className="brand">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
             <circle cx="12" cy="12" r="10" stroke="var(--accent)" strokeWidth="2" />
             <path d="M5 14c2-4 7-6 14-5" stroke="var(--primary)" strokeWidth="2" />
           </svg>
-          <span>基估宝</span>
+          <span>研估宝</span>
           <AnimatePresence>
             {isSyncing && (
               <motion.div
@@ -4303,149 +5860,321 @@ export default function HomePage() {
             )}
           </AnimatePresence>
         </div>
-        <div className="actions">
-          {hasUpdate && (
-            <div
-              className="badge"
-              title={`发现新版本 ${latestVersion}，点击前往下载`}
-              style={{ cursor: 'pointer', borderColor: 'var(--success)', color: 'var(--success)' }}
-              onClick={() => setUpdateModalOpen(true)}
-            >
-              <UpdateIcon width="14" height="14" />
-            </div>
-          )}
-          <img alt="项目Github地址" src={githubImg.src} style={{ width: '30px', height: '30px', cursor: 'pointer' }} onClick={() => window.open("https://github.com/hzm0321/real-time-fund")} />
-          <div className="badge" title="当前刷新频率">
-            <span>刷新</span>
-            <strong>{Math.round(refreshMs / 1000)}秒</strong>
-          </div>
-          <button
-            className="icon-button"
-            aria-label="立即刷新"
-            onClick={manualRefresh}
-            disabled={refreshing || funds.length === 0}
-            aria-busy={refreshing}
-            title="立即刷新"
-          >
-            <RefreshIcon className={refreshing ? 'spin' : ''} width="18" height="18" />
-          </button>
-          <button
-            className="icon-button"
-            aria-label="指标数据更新"
-            onClick={() => setDataUpdateModalOpen(true)}
-            title="指标数据更新"
-          >
-            <DatabaseIcon width="18" height="18" />
-          </button>
-          {/*<button*/}
-          {/*  className="icon-button"*/}
-          {/*  aria-label="打开设置"*/}
-          {/*  onClick={() => setSettingsOpen(true)}*/}
-          {/*  title="设置"*/}
-          {/*  hidden*/}
-          {/*>*/}
-          {/*  <SettingsIcon width="18" height="18" />*/}
-          {/*</button>*/}
-          {/* 用户菜单 */}
-          <div className="user-menu-container" ref={userMenuRef}>
-            <button
-              className={`icon-button user-menu-trigger ${user ? 'logged-in' : ''}`}
-              aria-label={user ? '用户菜单' : '登录'}
-              onClick={() => setUserMenuOpen(!userMenuOpen)}
-              title={user ? (user.email || '用户') : '用户菜单'}
-            >
-              {user ? (
-                <div className="user-avatar-small">
-                  {userAvatar ? (
-                    <img
-                      src={userAvatar}
-                      alt="用户头像"
-                      style={{ width: '100%', height: '100%', borderRadius: '50%' }}
-                    />
-                  ) : (
-                    (user.email?.charAt(0).toUpperCase() || 'U')
-                  )}
-                </div>
-              ) : (
-                <UserIcon width="18" height="18" />
-              )}
-            </button>
 
-            <AnimatePresence>
-              {userMenuOpen && (
+        {/* 功能栏 - 三段式布局 */}
+        <div className="toolbar" style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          flex: 1, 
+          marginLeft: 16,
+          gap: 8 
+        }}>
+          {/* 左侧：股票相关 */}
+          <div className="toolbar-group toolbar-left" style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 8,
+            flex: 1,
+            justifyContent: 'flex-start' 
+          }}>
+            {/* 自选股票 */}
+            <button
+              className="icon-button"
+              aria-label="自选股票"
+              onClick={() => setWatchlistModalOpen(true)}
+              title="自选股票"
+            >
+              <BookmarkIcon width="18" height="18" />
+            </button>
+            {/* 股票汇总 */}
+            <button
+              className="icon-button"
+              aria-label="股票汇总"
+              onClick={openStockListModal}
+              title="持仓股票汇总"
+            >
+              <ListIcon width="18" height="18" />
+            </button>
+          </div>
+
+          {/* 中间：研究相关 */}
+          <div className="toolbar-group toolbar-center" style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 8,
+            flex: 1,
+            justifyContent: 'center' 
+          }}>
+            {/* 持仓并集分析 */}
+            <button
+              className="icon-button"
+              aria-label="持仓并集分析"
+              onClick={() => setHoldingsUnionModalOpen(true)}
+              title="查看所有基金持仓股票的并集"
+            >
+              <GridIcon width="18" height="18" />
+            </button>
+            {/* 行业分类 */}
+            <button
+              className="icon-button"
+              aria-label="行业分类"
+              onClick={() => setIndustryModalOpen(true)}
+              title="Wind行业分类"
+            >
+              <LayersIcon width="18" height="18" />
+            </button>
+          </div>
+
+          {/* 右侧：功能和基金 */}
+          <div className="toolbar-group toolbar-right" style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 8,
+            flex: 1,
+            justifyContent: 'flex-end' 
+          }}>
+            {/* GitHub 链接 */}
+            <img 
+              alt="项目Github地址" 
+              src={githubImg.src} 
+              style={{ width: '30px', height: '30px', cursor: 'pointer' }} 
+              onClick={() => window.open("https://github.com/hzm0321/real-time-fund")} 
+            />
+            
+            {/* 刷新频率下拉选择器 */}
+            <div className="refresh-selector" ref={refreshDropdownRef} style={{ position: 'relative' }}>
+              <button
+                className={`badge refresh-badge ${refreshMs === 0 ? 'paused' : ''}`}
+                onClick={() => setRefreshDropdownOpen(!refreshDropdownOpen)}
+                title="点击选择刷新频率"
+                style={{
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '4px 10px',
+                  borderRadius: 16,
+                  border: '1px solid var(--border)',
+                  background: refreshMs === 0 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(34, 211, 238, 0.1)',
+                  color: refreshMs === 0 ? 'var(--danger)' : 'var(--primary)',
+                  fontSize: '12px',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {refreshMs === 0 ? (
+                  <>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--danger)' }} />
+                    <span>已停止</span>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ 
+                      width: 6, 
+                      height: 6, 
+                      borderRadius: '50%', 
+                      background: 'var(--success)',
+                      animation: 'pulse 2s infinite'
+                    }} />
+                    <span>刷新 {Math.round(refreshMs / 1000)}秒</span>
+                  </>
+                )}
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </button>
+              {refreshDropdownOpen && (
                 <motion.div
-                  className="user-menu-dropdown glass"
-                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                  initial={{ opacity: 0, y: -8, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                  transition={{ duration: 0.15 }}
-                  style={{ transformOrigin: 'top right' }}
+                  exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                  className="glass"
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: 0,
+                    marginTop: 4,
+                    minWidth: 120,
+                    borderRadius: 8,
+                    border: '1px solid var(--border)',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                    overflow: 'hidden',
+                    zIndex: 100
+                  }}
                 >
-                  {user ? (
-                    <>
-                      <div className="user-menu-header">
-                        <div className="user-avatar-large">
-                          {userAvatar ? (
-                            <img
-                              src={userAvatar}
-                              alt="用户头像"
-                              style={{ width: '100%', height: '100%', borderRadius: '50%' }}
-                            />
-                          ) : (
-                            (user.email?.charAt(0).toUpperCase() || 'U')
-                          )}
-                        </div>
-                        <div className="user-info">
-                          <span className="user-email">{user.email}</span>
-                          <span className="user-status">已登录</span>
-                        </div>
-                      </div>
-                      <div className="user-menu-divider" />
-                      <button
-                        className="user-menu-item"
-                        onClick={() => {
-                          setUserMenuOpen(false);
-                          setSettingsOpen(true);
-                        }}
-                      >
-                        <SettingsIcon width="16" height="16" />
-                        <span>设置</span>
-                      </button>
-                      <button
-                        className="user-menu-item danger"
-                        onClick={() => {
-                          setUserMenuOpen(false);
-                          setLogoutConfirmOpen(true);
-                        }}
-                      >
-                        <LogoutIcon width="16" height="16" />
-                        <span>登出</span>
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        className="user-menu-item"
-                        onClick={handleOpenLogin}
-                      >
-                        <LoginIcon width="16" height="16" />
-                        <span>登录</span>
-                      </button>
-                      <button
-                        className="user-menu-item"
-                        onClick={() => {
-                          setUserMenuOpen(false);
-                          setSettingsOpen(true);
-                        }}
-                      >
-                        <SettingsIcon width="16" height="16" />
-                        <span>设置</span>
-                      </button>
-                    </>
-                  )}
+                  {[
+                    { value: 0, label: '停止刷新' },
+                    { value: 15000, label: '15 秒' },
+                    { value: 30000, label: '30 秒' },
+                    { value: 60000, label: '60 秒' }
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => {
+                        setRefreshMs(option.value);
+                        setRefreshDropdownOpen(false);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        width: '100%',
+                        padding: '10px 14px',
+                        border: 'none',
+                        background: refreshMs === option.value ? 'rgba(34, 211, 238, 0.15)' : 'transparent',
+                        color: option.value === 0 ? 'var(--danger)' : 'var(--text)',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        fontSize: '13px',
+                        transition: 'background 0.15s'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (refreshMs !== option.value) {
+                          e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (refreshMs !== option.value) {
+                          e.currentTarget.style.background = 'transparent';
+                        }
+                      }}
+                    >
+                      {option.value === 0 ? (
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--danger)' }} />
+                      ) : refreshMs === option.value ? (
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--primary)' }} />
+                      ) : (
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', border: '1px solid var(--border)' }} />
+                      )}
+                      {option.label}
+                    </button>
+                  ))}
                 </motion.div>
               )}
-            </AnimatePresence>
+            </div>
+            
+            {/* 手动刷新 */}
+            <button
+              className="icon-button"
+              aria-label="立即刷新"
+              onClick={manualRefresh}
+              disabled={refreshing || funds.length === 0}
+              aria-busy={refreshing}
+              title="立即刷新"
+            >
+              <RefreshIcon className={refreshing ? 'spin' : ''} width="18" height="18" />
+            </button>
+            
+            {/* 数据更新 */}
+            <button
+              className="icon-button"
+              aria-label="指标数据更新"
+              onClick={() => setDataUpdateModalOpen(true)}
+              title="指标数据更新"
+            >
+              <DatabaseIcon width="18" height="18" />
+            </button>
+
+            {/* 用户菜单 */}
+            <div className="user-menu-container" ref={userMenuRef}>
+              <button
+                className={`icon-button user-menu-trigger ${user ? 'logged-in' : ''}`}
+                aria-label={user ? '用户菜单' : '登录'}
+                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                title={user ? (user.email || '用户') : '用户菜单'}
+              >
+                {user ? (
+                  <div className="user-avatar-small">
+                    {userAvatar ? (
+                      <img
+                        src={userAvatar}
+                        alt="用户头像"
+                        style={{ width: '100%', height: '100%', borderRadius: '50%' }}
+                      />
+                    ) : (
+                      (user.email?.charAt(0).toUpperCase() || 'U')
+                    )}
+                  </div>
+                ) : (
+                  <UserIcon width="18" height="18" />
+                )}
+              </button>
+
+              <AnimatePresence>
+                {userMenuOpen && (
+                  <motion.div
+                    className="user-menu-dropdown glass"
+                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                    style={{ transformOrigin: 'top right' }}
+                  >
+                    {user ? (
+                      <>
+                        <div className="user-menu-header">
+                          <div className="user-avatar-large">
+                            {userAvatar ? (
+                              <img
+                                src={userAvatar}
+                                alt="用户头像"
+                                style={{ width: '100%', height: '100%', borderRadius: '50%' }}
+                              />
+                            ) : (
+                              (user.email?.charAt(0).toUpperCase() || 'U')
+                            )}
+                          </div>
+                          <div className="user-info">
+                            <span className="user-email">{user.email}</span>
+                            <span className="user-status">已登录</span>
+                          </div>
+                        </div>
+                        <div className="user-menu-divider" />
+                        <button
+                          className="user-menu-item"
+                          onClick={() => {
+                            setUserMenuOpen(false);
+                            setSettingsOpen(true);
+                          }}
+                        >
+                          <SettingsIcon width="16" height="16" />
+                          <span>设置</span>
+                        </button>
+                        <button
+                          className="user-menu-item danger"
+                          onClick={() => {
+                            setUserMenuOpen(false);
+                            setLogoutConfirmOpen(true);
+                          }}
+                        >
+                          <LogoutIcon width="16" height="16" />
+                          <span>登出</span>
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          className="user-menu-item"
+                          onClick={handleOpenLogin}
+                        >
+                          <LoginIcon width="16" height="16" />
+                          <span>登录</span>
+                        </button>
+                        <button
+                          className="user-menu-item"
+                          onClick={() => {
+                            setUserMenuOpen(false);
+                            setSettingsOpen(true);
+                          }}
+                        >
+                          <SettingsIcon width="16" height="16" />
+                          <span>设置</span>
+                        </button>
+                      </>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
       </div>
@@ -5346,6 +7075,23 @@ export default function HomePage() {
         )}
       </AnimatePresence>
       <AnimatePresence>
+        {industryModalOpen && (
+          <IndustryModal
+            onClose={() => setIndustryModalOpen(false)}
+            data={industryData}
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {watchlistModalOpen && (
+          <WatchlistModal
+            isOpen={watchlistModalOpen}
+            onClose={() => setWatchlistModalOpen(false)}
+            user={user}
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
         {weChatOpen && (
             <WeChatModal onClose={() => setWeChatOpen(false)} />
         )}
@@ -5436,6 +7182,18 @@ export default function HomePage() {
         )}
       </AnimatePresence>
 
+      {/* 股票汇总弹窗 */}
+      <AnimatePresence>
+        {stockListModal.open && (
+          <StockListModal
+            loading={stockListModal.loading}
+            data={stockListModal.data}
+            onClose={() => setStockListModal({ open: false, loading: false, data: null })}
+            onStockClick={(stock) => setStockKlineModal({ open: true, stock })}
+          />
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {stockKlineModal.open && (
           <StockKlineModal
@@ -5485,6 +7243,18 @@ export default function HomePage() {
       <AnimatePresence>
         {dataUpdateModalOpen && (
           <DataUpdateModal onClose={() => setDataUpdateModalOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* 持仓并集分析弹窗 */}
+      <AnimatePresence>
+        {holdingsUnionModalOpen && (
+          <HoldingsUnionModal
+            isOpen={holdingsUnionModalOpen}
+            onClose={() => setHoldingsUnionModalOpen(false)}
+            funds={funds}
+            onStockClick={(stock) => setStockKlineModal({ open: true, stock })}
+          />
         )}
       </AnimatePresence>
 
@@ -5572,75 +7342,6 @@ export default function HomePage() {
           </div>
         </div>
       )}
-
-      {/* 更新提示弹窗 */}
-      <AnimatePresence>
-        {updateModalOpen && (
-          <motion.div
-            className="modal-overlay"
-            role="dialog"
-            aria-modal="true"
-            aria-label="更新提示"
-            onClick={() => setUpdateModalOpen(false)}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            style={{ zIndex: 10002 }}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="glass card modal"
-              style={{ maxWidth: '400px' }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="title" style={{ marginBottom: 12 }}>
-                <UpdateIcon width="20" height="20" style={{color: 'var(--success)'}} />
-                <span>更新提示</span>
-              </div>
-              <div style={{ marginBottom: 24 }}>
-                <p className="muted" style={{ fontSize: '14px', lineHeight: '1.6', marginBottom: 12 }}>
-                  检测到新版本，是否刷新浏览器以更新？
-                  <br/>
-                  更新内容如下：
-                </p>
-                {updateContent && (
-                  <div style={{
-                    background: 'rgba(0,0,0,0.2)',
-                    padding: '12px',
-                    borderRadius: '8px',
-                    fontSize: '13px',
-                    lineHeight: '1.5',
-                    maxHeight: '200px',
-                    overflowY: 'auto',
-                    whiteSpace: 'pre-wrap',
-                    border: '1px solid rgba(255,255,255,0.1)'
-                  }}>
-                    {updateContent}
-                  </div>
-                )}
-              </div>
-              <div className="row" style={{ gap: 12 }}>
-                <button
-                  className="button secondary"
-                  onClick={() => setUpdateModalOpen(false)}
-                  style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: 'var(--text)' }}
-                >
-                  取消
-                </button>
-                <button
-                  className="button"
-                  onClick={() => window.location.reload()}
-                  style={{ flex: 1, background: 'var(--success)', color: '#fff', border: 'none' }}
-                >
-                  刷新浏览器
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* 登录模态框 */}
       {loginModalOpen && (

@@ -42,7 +42,7 @@ export default function LoginPage() {
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h1 style={styles.title}>实时基金估值</h1>
+        <h1 style={styles.title}>研估宝</h1>
         <p style={styles.subtitle}>登录您的账户</p>
         <form onSubmit={handleLogin}>
           <input

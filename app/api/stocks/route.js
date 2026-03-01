@@ -50,9 +50,11 @@ function readAllStocks() {
   });
 }
 
-// 写入持仓数据
+// 写入持仓数据（支持扩展字段）
 function writeAllStocks(stocks) {
-  const headers = ['id', 'fund_code', 'stock_code', 'stock_name', 'weight', 'report_date', 'created_at'];
+  // 扩展表头：增加 fund_deleted_at 标记关联基金是否被删除
+  // extra_data 预留 JSON 扩展字段，方便后续增加更多属性
+  const headers = ['id', 'fund_code', 'stock_code', 'stock_name', 'weight', 'report_date', 'created_at', 'fund_deleted_at', 'extra_data'];
   const headerLine = headers.join(',');
   const lines = [headerLine, ...stocks.map(s => {
     return headers.map(h => {
@@ -196,35 +198,60 @@ export async function POST(request) {
   }
 }
 
-// 删除持仓数据
+// 删除持仓数据（软删除：标记 fund_deleted_at）
 export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url);
     const fundCode = searchParams.get('fundCode');
     const reportDate = searchParams.get('reportDate');
+    const mode = searchParams.get('mode'); // 'soft' 软删除, 'hard' 物理删除
 
     if (!fundCode) {
       return NextResponse.json({ error: 'fundCode is required' }, { status: 400 });
     }
 
     const allStocks = readAllStocks();
+    const now = new Date().toISOString();
 
-    let filteredStocks;
-    if (reportDate) {
-      // 删除特定报告期
-      filteredStocks = allStocks.filter(s =>
-        !(s.fund_code === fundCode && s.report_date === reportDate)
-      );
-    } else {
-      // 删除该基金所有持仓
-      filteredStocks = allStocks.filter(s => s.fund_code !== fundCode);
+    if (mode === 'hard') {
+      // 物理删除（保留用于特殊情况）
+      let filteredStocks;
+      if (reportDate) {
+        filteredStocks = allStocks.filter(s =>
+          !(s.fund_code === fundCode && s.report_date === reportDate)
+        );
+      } else {
+        filteredStocks = allStocks.filter(s => s.fund_code !== fundCode);
+      }
+      writeAllStocks(filteredStocks);
+      return NextResponse.json({ 
+        success: true,
+        mode: 'hard',
+        deleted: allStocks.length - filteredStocks.length
+      });
     }
 
-    writeAllStocks(filteredStocks);
+    // 默认软删除：标记 fund_deleted_at
+    let updatedCount = 0;
+    const updatedStocks = allStocks.map(s => {
+      const shouldMark = reportDate 
+        ? (s.fund_code === fundCode && s.report_date === reportDate)
+        : (s.fund_code === fundCode);
+      
+      if (shouldMark && !s.fund_deleted_at) {
+        updatedCount++;
+        return { ...s, fund_deleted_at: now };
+      }
+      return s;
+    });
+
+    writeAllStocks(updatedStocks);
 
     return NextResponse.json({ 
       success: true,
-      deleted: allStocks.length - filteredStocks.length
+      mode: 'soft',
+      updated: updatedCount,
+      message: '已标记为历史持仓，股票数据保留'
     });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
