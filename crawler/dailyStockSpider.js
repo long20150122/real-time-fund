@@ -6,12 +6,12 @@
  * node crawler/dailyStockSpider.js                     # 抓取所有股票最近30天数据
  * node crawler/dailyStockSpider.js --days=365          # 抓取所有股票最近365天数据
  * node crawler/dailyStockSpider.js --codes=00700,002027 # 仅抓取指定股票
- * node crawler/dailyStockSpider.js --from-2024         # 抓取2024年1月1日至今的数据（自动检测缺失数据）
+ * node crawler/dailyStockSpider.js --from-start        # 抓取2022年1月1日至今的数据（推荐：完整历史数据）
  * node crawler/dailyStockSpider.js --recalc-rsi        # 重新计算所有股票的RSI指标
  *
  * 分批抓取（避免一次性抓取过多）:
- * node crawler/dailyStockSpider.js --from-2024 --batch=20            # 每次抓20只股票
- * node crawler/dailyStockSpider.js --from-2024 --batch=20 --offset=20 # 从第21只开始抓
+ * node crawler/dailyStockSpider.js --from-start --batch=20            # 每次抓20只股票
+ * node crawler/dailyStockSpider.js --from-start --batch=20 --offset=20 # 从第21只开始抓
  *
  * 技术特点：
  * 1、双接口支持：腾讯接口（主要）+ 东方财富接口（备用）
@@ -35,8 +35,8 @@ const DATA_DIR = path.join(__dirname, "..", "data");
 const STOCKS_FILE = path.join(DATA_DIR, "stocks.csv");
 const STOCK_HISTORY_FILE = path.join(DATA_DIR, "stock_history.csv");
 
-// 起始日期常量（2024-01-02是2024年第一个交易日）
-const START_DATE_2024 = "2024-01-02";
+// 起始日期常量（默认从2022年1月1日开始）
+const START_DATE = "2022-01-01";
 
 // CSV 表头（包含RSI字段）
 const CSV_HEADERS = [
@@ -821,10 +821,20 @@ async function crawlAllStocks(days = 30, specificCodes = null, forceToday = fals
 
   if (specificCodes) {
     const codeSet = new Set(specificCodes);
-    stocks = stocks.filter((s) => codeSet.has(s.code));
+    const existingStocks = stocks.filter((s) => codeSet.has(s.code));
+    const existingCodes = new Set(existingStocks.map(s => s.code));
+    
+    // 对于不在 stocks.csv 中的代码，直接构造股票对象
+    const newCodes = specificCodes.filter(c => !existingCodes.has(c));
+    const newStocks = newCodes.map(code => ({ code, name: code }));
+    
+    stocks = [...existingStocks, ...newStocks];
     if (stocks.length === 0) {
-      console.log("指定的股票代码不在 stocks.csv 中");
+      console.log("未指定有效的股票代码");
       return;
+    }
+    if (newStocks.length > 0) {
+      console.log(`提示: ${newStocks.length} 只股票不在 stocks.csv 中，将直接爬取\n`);
     }
   }
 
@@ -974,7 +984,7 @@ function parseArgs() {
     days: 30,
     codes: null,
     forceToday: false,
-    from2024: false,
+    fromStart: false,
     recalcRSI: false,
     startDate: null,
     batchSize: 0,
@@ -992,11 +1002,12 @@ function parseArgs() {
         .filter(Boolean);
     } else if (arg === "--force-today" || arg === "--force") {
       result.forceToday = true;
-    } else if (arg === "--from-2024") {
-      result.from2024 = true;
-      result.startDate = START_DATE_2024;
-      // 计算从2024-01-01到今天的天数（大约）
-      const startDate = new Date(START_DATE_2024);
+    } else if (arg === "--from-start" || arg === "--from-2022" || arg === "--from-2024") {
+      // 兼容旧参数名，统一从2022-01-01开始
+      result.fromStart = true;
+      result.startDate = START_DATE;
+      // 计算从2022-01-01到今天的天数
+      const startDate = new Date(START_DATE);
       const today = new Date();
       const diffTime = Math.abs(today - startDate);
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -1021,7 +1032,7 @@ async function main() {
   console.log(`
 股票每日行情爬虫
 ================
-参数: --days=${args.days}${args.codes ? ` --codes=${args.codes.join(",")}` : ""}${args.forceToday ? " --force-today" : ""}${args.from2024 ? " --from-2024" : ""}${args.recalcRSI ? " --recalc-rsi" : ""}${batchInfo}
+参数: --days=${args.days}${args.codes ? ` --codes=${args.codes.join(",")}` : ""}${args.forceToday ? " --force-today" : ""}${args.fromStart ? " --from-start" : ""}${args.recalcRSI ? " --recalc-rsi" : ""}${batchInfo}
   `);
 
   if (!fs.existsSync(DATA_DIR)) {

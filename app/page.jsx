@@ -3595,11 +3595,11 @@ export default function HomePage() {
   const refreshingRef = useRef(false);
   const isLoggingOutRef = useRef(false);
 
-  // 刷新频率状态
-  const [refreshMs, setRefreshMs] = useState(30000);
+  // 刷新频率状态（默认已停止）
+  const [refreshMs, setRefreshMs] = useState(0);
   const [refreshDropdownOpen, setRefreshDropdownOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [tempSeconds, setTempSeconds] = useState(30);
+  const [tempSeconds, setTempSeconds] = useState(0);
 
   // 持仓并集弹窗状态
   const [holdingsUnionModalOpen, setHoldingsUnionModalOpen] = useState(false);
@@ -4649,8 +4649,9 @@ export default function HomePage() {
 
   useEffect(() => {
     try {
-      const savedMs = parseInt(localStorage.getItem('refreshMs') || '30000', 10);
-      if (Number.isFinite(savedMs) && savedMs >= 5000) {
+      const savedMs = parseInt(localStorage.getItem('refreshMs') || '0', 10);
+      // 允许 0（已停止）或 >= 5000 的有效值
+      if (savedMs === 0 || (Number.isFinite(savedMs) && savedMs >= 5000)) {
         setRefreshMs(savedMs);
         setTempSeconds(Math.round(savedMs / 1000));
       }
@@ -5335,7 +5336,7 @@ export default function HomePage() {
       favorites,
       groups,
       collapsedCodes,
-      refreshMs: Number.isFinite(payload.refreshMs) ? payload.refreshMs : 30000,
+      refreshMs: Number.isFinite(payload.refreshMs) ? payload.refreshMs : 0,
       holdings,
       pendingTrades,
       viewMode
@@ -5402,7 +5403,7 @@ export default function HomePage() {
         favorites: cleanedFavorites,
         groups: cleanedGroups,
         collapsedCodes: cleanedCollapsed,
-        refreshMs: parseInt(localStorage.getItem('refreshMs') || '30000', 10),
+        refreshMs: parseInt(localStorage.getItem('refreshMs') || '0', 10),
         holdings: cleanedHoldings,
         pendingTrades: cleanedPendingTrades,
         viewMode,
@@ -5414,7 +5415,7 @@ export default function HomePage() {
         favorites: [],
         groups: [],
         collapsedCodes: [],
-        refreshMs: 30000,
+        refreshMs: 0,
         holdings: {},
         pendingTrades: [],
         viewMode: 'card',
@@ -5447,7 +5448,9 @@ export default function HomePage() {
       setCollapsedCodes(new Set(nextCollapsed));
       storageHelper.setItem('collapsedCodes', JSON.stringify(nextCollapsed));
 
-      const nextRefreshMs = Number.isFinite(cloudData.refreshMs) && cloudData.refreshMs >= 5000 ? cloudData.refreshMs : 30000;
+      // 允许 refreshMs 为 0（已停止状态）
+      const nextRefreshMs = cloudData.refreshMs === 0 ? 0 :
+        (Number.isFinite(cloudData.refreshMs) && cloudData.refreshMs >= 5000 ? cloudData.refreshMs : 0);
       setRefreshMs(nextRefreshMs);
       setTempSeconds(Math.round(nextRefreshMs / 1000));
       storageHelper.setItem('refreshMs', String(nextRefreshMs));
@@ -5569,7 +5572,7 @@ export default function HomePage() {
         favorites: JSON.parse(localStorage.getItem('favorites') || '[]'),
         groups: JSON.parse(localStorage.getItem('groups') || '[]'),
         collapsedCodes: JSON.parse(localStorage.getItem('collapsedCodes') || '[]'),
-        refreshMs: parseInt(localStorage.getItem('refreshMs') || '30000', 10),
+        refreshMs: parseInt(localStorage.getItem('refreshMs') || '0', 10),
         viewMode: localStorage.getItem('viewMode') === 'list' ? 'list' : 'card',
         holdings: JSON.parse(localStorage.getItem('holdings') || '{}'),
         pendingTrades: JSON.parse(localStorage.getItem('pendingTrades') || '[]'),

@@ -84,17 +84,17 @@ export default function WatchlistModal({ isOpen, onClose, user }) {
         setCategories(cats);
         setAllStocks(allStocksList);
 
-        // 立即获取实时行情
-        if (allStocksList.length > 0) {
-          fetchRealtime(allStocksList);
-        }
-
         // 默认选中第一个分类
         if (cats.length > 0) {
           setSelectedCategory(cats[0]);
           // 从已加载的所有股票中筛选当前分类的股票
           const firstCatId = cats[0].id;
           setStocks(allStocksList.filter(s => s.category_id === firstCatId));
+        }
+
+        // 等待实时行情加载完成后再结束 loading（避免闪烁）
+        if (allStocksList.length > 0) {
+          await fetchRealtime(allStocksList);
         }
       } catch (error) {
         console.error('初始化数据失败:', error);

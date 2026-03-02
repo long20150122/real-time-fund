@@ -95,8 +95,8 @@ function StockItem({
   // 合并拖拽状态
   const isDragging = isDraggingFromProps || isCrossCategoryDragging;
 
-  // 合并数据
-  const displayData = { ...stock, ...realtimeData };
+  // 合并数据（保留 stock 的名称，因为 realtimeData 的名称是 GBK 乱码）
+  const displayData = { ...stock, ...realtimeData, stock_name: stock.stock_name };
   const change = realtimeData?.change || 0;
   const changePercent = realtimeData?.change_percent || 0;
   const changeColor = getChangeColor(change);
