@@ -104,7 +104,6 @@ export default function StockSearch({ onClose, onStockAdded }) {
         justifyContent: 'center',
         zIndex: 10020,
       }}
-      onClick={onClose}
     >
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}

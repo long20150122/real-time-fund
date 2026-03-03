@@ -238,7 +238,6 @@ export default function WatchlistModal({ isOpen, onClose, user }) {
             role="dialog"
             aria-modal="true"
             aria-label="自选股票"
-            onClick={onClose}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

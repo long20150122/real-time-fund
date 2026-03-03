@@ -83,7 +83,6 @@ function ConfirmDialogOverlay({ dialog }) {
         justifyContent: 'center',
         zIndex: 99998,
       }}
-      onClick={dialog.onCancel}
     >
             <motion.div
               initial={{ scale: 0.95, opacity: 0, y: 20 }}

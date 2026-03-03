@@ -481,13 +481,23 @@ function HistoryHoldingsModal({ fund, loading, data, onClose, onStockClick }) {
     return null;
   };
 
+  // 计算股票连续持有的季度数（从最新季度开始连续持有）
+  const getConsecutiveHoldings = (stockCode, periodIndex, allPeriods) => {
+    let count = 0;
+    for (let i = periodIndex; i < allPeriods.length; i++) {
+      const period = allPeriods[i];
+      const hasStock = period.stocks.some(s => s.stock_code === stockCode);
+      if (hasStock) { count++; } else { break; }
+    }
+    return count;
+  };
+
   return (
     <motion.div
       className="modal-overlay"
       role="dialog"
       aria-modal="true"
       aria-label="历史持仓"
-      onClick={onClose}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -644,6 +654,7 @@ function HistoryHoldingsModal({ fund, loading, data, onClose, onStockClick }) {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
                     {period.stocks.map((stock, idx) => {
                       const changeInfo = getStockChangeInfo(stock, period, index, data.periods);
+                      const consecutiveCount = getConsecutiveHoldings(stock.stock_code, index, data.periods);
                       
                       return (
                         <div 
@@ -664,6 +675,20 @@ function HistoryHoldingsModal({ fund, loading, data, onClose, onStockClick }) {
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0 }}>
                             <span className="muted" style={{ fontSize: '10px', minWidth: '14px' }}>{idx + 1}</span>
                             <span style={{ fontSize: '12px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stock.stock_name}</span>
+                            {/* 连续持有季度数标签 */}
+                            {consecutiveCount > 1 && (
+                              <span style={{ 
+                                fontSize: '9px', 
+                                color: 'var(--primary)', 
+                                background: 'rgba(34, 211, 238, 0.15)',
+                                padding: '0 4px',
+                                borderRadius: '3px',
+                                fontWeight: 500,
+                                flexShrink: 0
+                              }} title={`连续持有${consecutiveCount}个季度`}>
+                                连{consecutiveCount}
+                              </span>
+                            )}
                             {/* 新调入标签 */}
                             {changeInfo?.type === 'added' && (
                               <span style={{ 
@@ -7277,7 +7302,7 @@ export default function HomePage() {
       </AnimatePresence>
 
       {settingsOpen && (
-        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="设置" onClick={() => setSettingsOpen(false)}>
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="设置">
           <div className="glass card modal" onClick={(e) => e.stopPropagation()}>
             <div className="title" style={{ marginBottom: 12 }}>
               <SettingsIcon width="20" height="20" />

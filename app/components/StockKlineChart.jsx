@@ -264,7 +264,6 @@ export default function StockKlineModal({ stock, onClose }) {
       role="dialog"
       aria-modal="true"
       aria-label="股票K线图"
-      onClick={onClose}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
