@@ -1110,25 +1110,27 @@ node crawler/quarterFinanceSpider.js --force
 ---
 
 # 先讲一下，需要的数据你会处理？再做
+
 1、在左上角增加一个入口叫做股票，用户点击股票打开一个大的弹窗；
 2、列表把所有的基金持仓的所有的股票拿出来到这边展示出来，同时展示股票名称，股票代码，最新价，最新涨跌幅，以及公司的规模、市值和流动市值，还有连续涨了多少天，连续跌了多少天这些数据，有多少基金持有；
-3、点击股票的时候，可以展示出它的K线图那个组件出来，你现在已经有了的那个弹窗。
+3、点击股票的时候，可以展示出它的 K 线图那个组件出来，你现在已经有了的那个弹窗。
 4、每个交易日收盘更新（讲一下你的更新策略是什么）
 
 用户提出了一个新功能需求：在左上角增加一个"股票"入口，展示所有基金持仓的股票汇总列表。让我先分析这个需求：
 
 1. **入口位置**: 左上角增加"股票"按钮
-2. **弹窗内容**: 
+2. **弹窗内容**:
    - 所有基金持仓的所有股票汇总
    - 展示字段：股票名称、股票代码、最新价、最新涨跌幅、公司规模、市值、流动市值、连续涨跌天数、持有基金数
-3. **交互**: 点击股票展示K线图弹窗（已有组件）
+3. **交互**: 点击股票展示 K 线图弹窗（已有组件）
 4. **数据更新策略**: 每个交易日收盘后更新
 
 首先我需要了解：
+
 1. 现有数据结构 - stocks.csv, funds.csv, stock_history.csv 等
 2. 是否有股票实时价格数据的获取方式
 3. 是否有股票基本面数据（市值、流通市值等）
-4. 现有的K线图组件
+4. 现有的 K 线图组件
 
 让我先查看相关数据文件和组件。
 我先分析一下需求，看看现有数据结构和需要补充的内容。
@@ -1136,25 +1138,28 @@ node crawler/quarterFinanceSpider.js --force
 
 1. **stocks.csv**: 基金持仓数据
    - fund_code, stock_code, stock_name, weight, report_date
-   
 2. **stock_history.csv**: 股票历史行情数据
+
    - stock_code, stock_name, trade_date, open, close, high, low, volume, amount, float_cap, turnover_rate, pe_ttm, pb
 
-3. **StockKlineModal**: 已有的K线图弹窗组件
+3. **StockKlineModal**: 已有的 K 线图弹窗组件
 
 现在我需要分析：
-1. 需要补充的数据：最新价、最新涨跌幅、市值、流通市值（float_cap已有）、连续涨跌天数
+
+1. 需要补充的数据：最新价、最新涨跌幅、市值、流通市值（float_cap 已有）、连续涨跌天数
 2. 现有数据可以计算：连续涨跌天数、持有基金数
 
-让我继续查看现有的API和数据获取方式。
-让我继续查看现有的API和数据结构，了解需要补充的数据。
-现在我已经了解了现有的数据结构和组件。让我查看一下stock-finance API，看看是否有市值等数据。
+让我继续查看现有的 API 和数据获取方式。
+让我继续查看现有的 API 和数据结构，了解需要补充的数据。
+现在我已经了解了现有的数据结构和组件。让我查看一下 stock-finance API，看看是否有市值等数据。
 让我查看股票财务数据和现有爬虫，了解数据获取能力。
 现在我已经了解了整个项目的数据结构和现有能力：
 
 **现有数据：**
+
 1. `stocks.csv` - 基金持仓数据
 2. `stock_history.csv` - 股票历史行情，包含：
+
    - stock_code, stock_name, trade_date
    - open, close, high, low
    - volume, amount
@@ -1165,6 +1170,7 @@ node crawler/quarterFinanceSpider.js --force
 3. `stock_quarter_finance.csv` - 股票季度财务数据
 
 **需要补充的数据：**
+
 1. 最新价 - 可从 stock_history 最新一条获取
 2. 最新涨跌幅 - 需要计算 或直接从实时接口获取
 3. 总市值 - stock_history 中只有 float_cap（流通市值）
@@ -1172,24 +1178,26 @@ node crawler/quarterFinanceSpider.js --force
 
 **数据更新策略分析：**
 用户问每个交易日收盘更新，我需要分析：
+
 1. 现有爬虫 `dailyStockSpider.js` 可以抓取股票历史数据
 2. 需要一个定时任务来在交易日收盘后更新
 
 让我先向用户解释数据情况和开发方案。
+
 ## 需求分析与数据情况
 
 ### 一、现有数据能力
 
-| 数据项 | 来源 | 状态 |
-|--------|------|------|
-| 股票代码/名称 | `stocks.csv` | ✓ 已有 |
-| 最新价 | `stock_history.csv` 最新记录 | ✓ 可计算 |
-| 最新涨跌幅 | 需计算 `(close-prev_close)/prev_close` | ✓ 可计算 |
-| 流通市值 | `stock_history.csv` → `float_cap` | ✓ 已有 |
-| **总市值** | 需补充 | ⚠ 缺失 |
-| 连续涨跌天数 | 需从历史数据计算 | ✓ 可计算 |
-| 持有基金数 | 从 `stocks.csv` 统计 | ✓ 可计算 |
-| K线图组件 | `StockKlineModal` | ✓ 已有 |
+| 数据项        | 来源                                   | 状态     |
+| ------------- | -------------------------------------- | -------- |
+| 股票代码/名称 | `stocks.csv`                           | ✓ 已有   |
+| 最新价        | `stock_history.csv` 最新记录           | ✓ 可计算 |
+| 最新涨跌幅    | 需计算 `(close-prev_close)/prev_close` | ✓ 可计算 |
+| 流通市值      | `stock_history.csv` → `float_cap`      | ✓ 已有   |
+| **总市值**    | 需补充                                 | ⚠ 缺失   |
+| 连续涨跌天数  | 需从历史数据计算                       | ✓ 可计算 |
+| 持有基金数    | 从 `stocks.csv` 统计                   | ✓ 可计算 |
+| K 线图组件    | `StockKlineModal`                      | ✓ 已有   |
 
 ### 二、需要处理的数据
 
@@ -1228,59 +1236,62 @@ node crawler/quarterFinanceSpider.js --force
 
 1. **总市值数据**：是否需要补充？还是暂时用流通市值代替？
 2. **实时涨跌幅**：是否需要实时数据？还是用收盘后计算的历史涨跌幅即可？
-3. **更新策略**：采用方案A+C（手动更新+时间提示）是否可以？
+3. **更新策略**：采用方案 A+C（手动更新+时间提示）是否可以？
 
 1、直接补充
 2、实时数据
 3、可以
 
-
 ## 开发完成总结
 
 ### 一、新增文件
 
-| 文件 | 说明 |
-|------|------|
-| `app/api/stock-list/route.js` | 股票汇总列表API |
-| `app/api/stock-realtime/route.js` | 实时行情API（腾讯接口） |
-| `test/test-stock-list-api.js` | API测试脚本 |
+| 文件                              | 说明                     |
+| --------------------------------- | ------------------------ |
+| `app/api/stock-list/route.js`     | 股票汇总列表 API         |
+| `app/api/stock-realtime/route.js` | 实时行情 API（腾讯接口） |
+| `test/test-stock-list-api.js`     | API 测试脚本             |
 
 ### 二、修改文件
 
-| 文件 | 变更内容 |
-|------|----------|
+| 文件           | 变更内容                         |
+| -------------- | -------------------------------- |
 | `app/page.jsx` | 添加状态变量、入口按钮、弹窗组件 |
 
 ### 三、功能实现
 
 #### 1. 入口位置
-- **左上角**：Logo右侧新增"股票"按钮
+
+- **左上角**：Logo 右侧新增"股票"按钮
 - 点击打开股票汇总弹窗
 
 #### 2. 股票汇总弹窗
-| 字段 | 说明 |
-|------|------|
-| 股票代码 | 支持排序 |
-| 股票名称 | 支持搜索过滤 |
-| 最新价 | 实时获取 |
-| 涨跌幅 | 实时获取，红色涨/绿色跌 |
-| 总市值 | 实时获取（亿元） |
-| 流通市值 | 实时获取（亿元） |
-| 连涨天数 | 从历史数据计算 |
-| 连跌天数 | 从历史数据计算 |
-| PE(TTM) | 实时获取 |
-| 持有基金数 | 统计持有该股票的基金数 |
+
+| 字段       | 说明                    |
+| ---------- | ----------------------- |
+| 股票代码   | 支持排序                |
+| 股票名称   | 支持搜索过滤            |
+| 最新价     | 实时获取                |
+| 涨跌幅     | 实时获取，红色涨/绿色跌 |
+| 总市值     | 实时获取（亿元）        |
+| 流通市值   | 实时获取（亿元）        |
+| 连涨天数   | 从历史数据计算          |
+| 连跌天数   | 从历史数据计算          |
+| PE(TTM)    | 实时获取                |
+| 持有基金数 | 统计持有该股票的基金数  |
 
 #### 3. 交互功能
+
 - 点击表头排序
 - 搜索框过滤
-- 点击股票行打开K线图弹窗
+- 点击股票行打开 K 线图弹窗
 
 #### 4. 数据更新策略
-- **手动更新**：点击"更新数据"按钮触发爬虫
-- **时间提示**：显示最后更新时间，超过1个交易日提示更新
 
-### 四、API测试结果
+- **手动更新**：点击"更新数据"按钮触发爬虫
+- **时间提示**：显示最后更新时间，超过 1 个交易日提示更新
+
+### 四、API 测试结果
 
 ```
 持仓记录数: 600
@@ -1304,30 +1315,178 @@ node crawler/quarterFinanceSpider.js --force
 点击股票行 → 打开K线图弹窗
 ```
 
-# ft问：
-我的需求不需要把全世场的股票都记录呀，我只要把添加的股票记录下来，然后可以的实时数据查这些的。全资产的话，我只要在搜索的过程中我能搜出来，然后我把它添加进去，再进入到我的数据库csv里面去的；
+# ft 问：
+
+我的需求不需要把全世场的股票都记录呀，我只要把添加的股票记录下来，然后可以的实时数据查这些的。全资产的话，我只要在搜索的过程中我能搜出来，然后我把它添加进去，再进入到我的数据库 csv 里面去的；
 你是这么做的吗？
 
-# GLM5回答：
+# GLM5 回答：
+
 实现方案总结 ✅
 你的需求
 不存储全市场股票 - 搜索时在线查询
 只存储用户添加的股票 - 保存到 watchlist_stocks.csv
-支持 A股 + 港股 - 全市场搜索
+支持 A 股 + 港股 - 全市场搜索
 最终实现
-功能	实现方式
-搜索	在线调用东方财富API，支持A股+港股全市场搜索
-添加	保存到 watchlist_stocks.csv（仅代码和关联信息）
-详情	从 stock_history.csv 获取RSI数据，或在线获取基本信息
+功能 实现方式
+搜索 在线调用东方财富 API，支持 A 股+港股全市场搜索
+添加 保存到 watchlist_stocks.csv（仅代码和关联信息）
+详情 从 stock_history.csv 获取 RSI 数据，或在线获取基本信息
 数据流
 code
-用户搜索 → 在线API返回结果 → 用户点击添加 → 存入 watchlist_stocks.csv
-                                                    ↓
-                              显示详情 ← 从 stock_history.csv 获取RSI
-                                         或在线获取基本信息
+用户搜索 → 在线 API 返回结果 → 用户点击添加 → 存入 watchlist_stocks.csv
+↓
+显示详情 ← 从 stock_history.csv 获取 RSI
+或在线获取基本信息
 文件说明
-文件	用途
-watchlist_stocks.csv	存储用户添加的自选股（仅代码、分类等）
-watchlist_categories.csv	存储用户的分类
-stock_history.csv	已有历史数据的股票（RSI等指标）
-不需要 all_stocks.csv，搜索时直接调用在线API。
+文件 用途
+watchlist_stocks.csv 存储用户添加的自选股（仅代码、分类等）
+watchlist_categories.csv 存储用户的分类
+stock_history.csv 已有历史数据的股票（RSI 等指标）
+不需要 all_stocks.csv，搜索时直接调用在线 API。
+
+# 新开发一个功能，左上角“产业链”分析按钮 -> 打开产业链弹框(里面展示所有产业链【静态数据，放到产业链表里】，平铺一个一个格子展示，支持拖动排序，排序跟着用户走) -> 点击某个产业链（比如：AI）-> 打开一个弹框（左侧是产业链涉及到的概念 比如：cpo、pcb...，右侧展示全产业链图,放在 assets/chain 目录）-> 点击对应的概念会展示出，前 10 的股票和概念链图，并标出基金重仓的；股票支持点击查看历史走势；先给技术方案，你准备怎么设计表结构，准备做几个爬虫？产业链图你可以去小红书的一些财经博主里爬吗？
+
+用户回答了我的问题：
+
+1. 让我看是否有现成的产业链数据
+2. 产业链图从其他地方爬取，采用 PNG 格式
+3. 概念名称自动关联，但也支持手动维护
+4. 使用现有的基金重仓数据
+
+我需要先查看：
+
+1. 现有的基金持仓数据结构
+2. 是否有产业链相关的数据
+3. 股票概念数据的结构
+
+让我先检查现有数据。
+让我先检查现有数据结构：
+看起来：
+
+1. `stocks.csv` 实际上是基金持仓数据（fund_code, stock_code, weight, report_date）
+2. 有季度财务数据爬虫
+3. 现有数据中没有产业链相关数据
+
+让我再看一下基金相关的数据结构和股票列表：
+现在我有了完整的项目理解：
+
+1. **数据结构**：
+
+   - `stocks.csv` - 实际是基金持仓数据
+   - `funds.csv` - 用户关注的基金列表
+   - `stock_concept.csv` - 股票概念（目前为空）
+   - `industry_classification.csv` - 行业分类
+
+2. **现有数据中没有产业链相关数据**，需要新建
+
+3. **基金重仓数据**：`stocks.csv` 中有 `fund_code` 和 `stock_code` 的关联
+
+现在我需要给用户一个完整的技术方案，然后开始实施。根据用户的要求：
+
+1. 产业链数据需要爬取或创建
+2. 产业链图从其他地方爬取，PNG 格式
+3. 概念名称自动关联，支持手动维护
+4. 基金重仓使用现有数据，每次进入重新查询
+
+让我给出最终的技术方案并开始实施。
+现在我已了解项目完整结构。总结如下：
+
+---
+
+## 最终技术方案
+
+### 一、表结构设计
+
+| 表名                          | 字段                                               | 说明                                      |
+| ----------------------------- | -------------------------------------------------- | ----------------------------------------- |
+| `industry_chains.csv`         | id, name, description, sort_order, created_at      | 产业链主表                                |
+| `industry_chain_concepts.csv` | id, chain_id, concept_name, sort_order, is_manual  | 产业链-概念关联（is_manual 标记手动维护） |
+| `industry_chain_images.csv`   | id, chain_id, image_path, image_type, concept_name | 图片表（full=全产业链, concept=概念链图） |
+| `user_chain_sort.csv`         | id, user_id, chain_id, sort_order                  | 用户排序                                  |
+
+### 二、爬虫设计
+
+| 爬虫                     | 数据源             | 功能                             |
+| ------------------------ | ------------------ | -------------------------------- |
+| `industryChainSpider.js` | 东方财富概念板块   | 爬取概念列表、生成产业链基础数据 |
+| `conceptStockSpider.js`  | 东方财富概念成分股 | 获取概念 Top10 股票              |
+
+### 三、数据流
+
+```
+产业链列表 → 点击产业链 → 概念列表(自动/手动关联) → 点击概念 → Top10股票 + 基金重仓标注
+```
+
+### 四、基金重仓判断
+
+```javascript
+// 从 stocks.csv 中查询
+const isHeavyHeld =
+  stocks.filter(
+    (s) => s.stock_code === targetStock && s.report_date === latestReportDate
+  ).length > 0;
+```
+
+我需要继续完成产业链功能的集成。目前已经：
+
+1. 创建了数据表
+2. 创建了爬虫
+3. 创建了 API 接口
+4. 创建了前端组件
+5. 添加了图标导入和状态变量
+
+## 产业链功能开发完成情况
+
+### ✅ 已完成
+
+| 模块         | 文件                                   | 状态 |
+| ------------ | -------------------------------------- | ---- |
+| **数据表**   | `data/industry_chains.csv`             | ✅   |
+|              | `data/industry_chain_concepts.csv`     | ✅   |
+|              | `data/industry_chain_images.csv`       | ✅   |
+|              | `data/user_chain_sort.csv`             | ✅   |
+| **爬虫**     | `crawler/conceptStockSpider.js`        | ✅   |
+| **API**      | `app/api/industry-chains/route.js`     | ✅   |
+|              | `app/api/concept-stocks/route.js`      | ✅   |
+| **组件**     | `app/components/IndustryChainModal/`   | ✅   |
+|              | - index.jsx (主弹框)                   | ✅   |
+|              | - ChainGrid.jsx (格子展示)             | ✅   |
+|              | - ChainCard.jsx (卡片组件)             | ✅   |
+|              | - ChainDetailModal.jsx (详情弹框)      | ✅   |
+|              | - ConceptList.jsx (概念列表)           | ✅   |
+|              | - ChainImageViewer.jsx (图片展示)      | ✅   |
+|              | - ConceptStocks.jsx (股票列表)         | ✅   |
+|              | - hooks/useChainDrag.js (拖拽 Hook)    | ✅   |
+| **图标**     | `app/components/Icons.jsx` (ChainIcon) | ✅   |
+| **图片目录** | `app/assets/chain/`                    | ✅   |
+
+### ⏳ 待手动处理
+
+由于 `page.jsx` 文件编码问题，需要在项目能正常运行后手动添加：
+
+```javascript
+// 1. 导入 (第12-15行)
+import { ..., ChainIcon } from "./components/Icons";
+import IndustryChainModal from "./components/IndustryChainModal";
+
+// 2. 状态 (约第3681行)
+const [chainModalOpen, setChainModalOpen] = useState(false);
+
+// 3. 按钮 (行业分类按钮后面)
+{/* 产业链分析 */}
+<button className="icon-button" onClick={() => setChainModalOpen(true)} title="产业链分析">
+  <ChainIcon width="18" height="18" />
+</button>
+
+// 4. 弹框 (IndustryModal后面)
+{chainModalOpen && (
+  <IndustryChainModal isOpen={chainModalOpen} onClose={() => setChainModalOpen(false)} userId={user?.id} />
+)}
+```
+
+### 运行爬虫获取数据
+
+```bash
+node crawler/conceptStockSpider.js
+```

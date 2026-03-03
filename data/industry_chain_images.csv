@@ -1,0 +1,7 @@
+id,chain_id,image_path,image_type,concept_name,sort_order
+img_ai_full,chain_ai,/assets/chain/AI-chain.png,full,,1
+img_chip_full,chain_chip,/assets/chain/CHIP-chain.png,full,,1
+img_ev_full,chain_ev,/assets/chain/ev-full.png,full,,1
+img_pv_full,chain_pv,/assets/chain/pv-full.png,full,,1
+img_med_full,chain_med,/assets/chain/med-full.png,full,,1
+img_5g_full,chain_5g,/assets/chain/5g-full.png,full,,1

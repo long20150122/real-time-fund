@@ -1,0 +1,6 @@
+// 产业链分析功能修改点：
+// 1. 导入 ChainIcon 和 IndustryChainModal
+// 2. 添加 chainModalOpen 状态
+// 3. 添加产业链按钮
+// 4. 添加弹框渲染
+// 5. 更新 useEffect 依赖

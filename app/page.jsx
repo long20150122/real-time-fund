@@ -9,11 +9,11 @@ import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import Announcement from "./components/Announcement";
 import { DatePicker, NumericInput, Stat } from "./components/Common";
-import { ChevronIcon, CloseIcon, CloudIcon, DatabaseIcon, DragIcon, ExitIcon, EyeIcon, EyeOffIcon, GridIcon, LayersIcon, ListIcon, LoginIcon, LogoutIcon, MailIcon, PinIcon, PinOffIcon, PlusIcon, RefreshIcon, SettingsIcon, SortIcon, StarIcon, TrashIcon, UpdateIcon, UserIcon, BookmarkIcon } from "./components/Icons";
+import { ChevronIcon, CloseIcon, CloudIcon, DatabaseIcon, DragIcon, ExitIcon, EyeIcon, EyeOffIcon, GridIcon, LayersIcon, ListIcon, LoginIcon, LogoutIcon, MailIcon, PinIcon, PinOffIcon, PlusIcon, RefreshIcon, SettingsIcon, SortIcon, StarIcon, TrashIcon, UpdateIcon, UserIcon, BookmarkIcon, ChainIcon } from "./components/Icons";
 import StockKlineModal from "./components/StockKlineChart";
 import WatchlistModal from "./components/WatchlistModal";
+import IndustryChainModal from "./components/IndustryChainModal";
 import githubImg from "./assets/github.svg";
-import weChatGroupImg from "./assets/weChatGroup.png";
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { fetchFundData, fetchShanghaiIndexDate, fetchSmartFundNetValue, searchFunds, submitFeedback } from './api/fund';
 import { useLockBodyScroll } from './hooks/useLockBodyScroll';
@@ -229,7 +229,7 @@ function IndustryModal({ onClose, data }) {
   );
 }
 
-function FeedbackModal({ onClose, user, onOpenWeChat }) {
+function FeedbackModal({ onClose, user }) {
   const [submitting, setSubmitting] = useState(false);
   const [succeeded, setSucceeded] = useState(false);
   const [error, setError] = useState("");
@@ -356,62 +356,9 @@ function FeedbackModal({ onClose, user, onOpenWeChat }) {
                 </a>
                 区留言互动
               </p>
-              <p className="muted" style={{ fontSize: '12px', lineHeight: '1.6' }}>
-                或加入我们的
-                <a
-                  className="link-button"
-                  style={{ color: 'var(--primary)', textDecoration: 'underline', padding: '0 4px', fontWeight: 600, cursor: 'pointer' }}
-                  onClick={onOpenWeChat}
-                >
-                  微信用户交流群
-                </a>
-              </p>
             </div>
           </form>
         )}
-      </motion.div>
-    </motion.div>
-  );
-}
-
-function WeChatModal({ onClose }) {
-  // 锁定背景滚动
-  useLockBodyScroll(true);
-
-  return (
-    <motion.div
-      className="modal-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-label="微信用户交流群"
-      onClick={onClose}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      style={{ zIndex: 10002 }}
-    >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="glass card modal"
-        onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '360px', padding: '24px' }}
-      >
-        <div className="title" style={{ marginBottom: 20, justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span>💬 微信用户交流群</span>
-            </div>
-            <button className="icon-button" onClick={onClose} style={{ border: 'none', background: 'transparent' }}>
-                <CloseIcon width="20" height="20" />
-            </button>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <img src={weChatGroupImg.src} alt="WeChat Group" style={{ maxWidth: '100%', borderRadius: '8px' }} />
-        </div>
-        <p className="muted" style={{ textAlign: 'center', marginTop: 16, fontSize: '14px' }}>
-            扫码加入群聊，获取最新更新与交流
-        </p>
       </motion.div>
     </motion.div>
   );
@@ -3674,7 +3621,6 @@ export default function HomePage() {
   // 反馈弹窗状态
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackNonce, setFeedbackNonce] = useState(0);
-  const [weChatOpen, setWeChatOpen] = useState(false);
 
   // 行业分类弹窗状态
   const [industryModalOpen, setIndustryModalOpen] = useState(false);
@@ -3684,6 +3630,9 @@ export default function HomePage() {
 
   // 自选股弹窗状态
   const [watchlistModalOpen, setWatchlistModalOpen] = useState(false);
+
+  // 产业链弹窗状态
+  const [chainModalOpen, setChainModalOpen] = useState(false);
 
   // 行业分类数据（Wind四级分类）
   const industryData = useMemo(() => {
@@ -5782,8 +5731,7 @@ export default function HomePage() {
       actionModal.open ||
       tradeModal.open ||
       !!clearConfirm ||
-      !!fundDeleteConfirm ||
-      weChatOpen;
+      !!fundDeleteConfirm;
 
     if (isAnyModalOpen) {
       document.body.style.overflow = 'hidden';
@@ -5809,8 +5757,7 @@ export default function HomePage() {
     historyModal.open,
     actionModal.open,
     tradeModal.open,
-    clearConfirm,
-    weChatOpen
+    clearConfirm
   ]);
 
   useEffect(() => {
@@ -5922,6 +5869,15 @@ export default function HomePage() {
               title="持仓股票汇总"
             >
               <ListIcon width="18" height="18" />
+            </button>
+            {/* 产业链分析 */}
+            <button
+              className="icon-button"
+              aria-label="产业链分析"
+              onClick={() => setChainModalOpen(true)}
+              title="产业链分析"
+            >
+              <ChainIcon width="18" height="18" />
             </button>
           </div>
 
@@ -7098,7 +7054,6 @@ export default function HomePage() {
             key={feedbackNonce}
             onClose={() => setFeedbackOpen(false)}
             user={user}
-            onOpenWeChat={() => setWeChatOpen(true)}
           />
         )}
       </AnimatePresence>
@@ -7119,11 +7074,12 @@ export default function HomePage() {
           />
         )}
       </AnimatePresence>
-      <AnimatePresence>
-        {weChatOpen && (
-            <WeChatModal onClose={() => setWeChatOpen(false)} />
-        )}
-      </AnimatePresence>
+      {/* 产业链分析弹框 */}
+      <IndustryChainModal
+        isOpen={chainModalOpen}
+        onClose={() => setChainModalOpen(false)}
+        userId={user?.id}
+      />
       <AnimatePresence>
         {addResultOpen && (
           <AddResultModal

@@ -2,16 +2,16 @@
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FolderIcon, FolderOpenIcon, ChevronRightIcon, ChevronDownIcon, PlusIcon, EditIcon, TrashIcon } from '../Icons';
+import { FolderIcon, FolderOpenIcon, ChevronRightIcon, ChevronDownIcon, PlusIcon, EditIcon, TrashIcon, DragIcon } from '../Icons';
 import { useWatchlist } from './index';
 import { useToast } from '../UI';
 import CategoryStats, { calculateCategoryStats } from './CategoryStats';
-import { useCategoryDrop } from './DragDropContext';
+import { useCategoryDrop, useCategoryDrag, useCategoryReorderDrop } from './DragDropContext';
 
 /**
  * 分类项组件
  */
-function CategoryItem({ category, level = 0, onSelect, onEdit, onDelete, onAddChild, stats }) {
+function CategoryItem({ category, level = 0, onSelect, onEdit, onDelete, onAddChild, stats, onReorder }) {
   const { selectedCategory } = useWatchlist();
   const [isExpanded, setIsExpanded] = useState(true);
   const [showActions, setShowActions] = useState(false);
@@ -20,7 +20,7 @@ function CategoryItem({ category, level = 0, onSelect, onEdit, onDelete, onAddCh
   const isSelected = selectedCategory?.id === category.id;
   const isSystem = category.is_system === '1';
 
-  // 拖放目标功能
+  // 拖放目标功能（股票拖入分类）
   const {
     isDropTarget,
     canDrop,
@@ -30,11 +30,35 @@ function CategoryItem({ category, level = 0, onSelect, onEdit, onDelete, onAddCh
     handleDrop,
   } = useCategoryDrop(category.id, selectedCategory?.id);
 
+  // 分类拖拽功能
+  const {
+    isDragging,
+    handleDragStart,
+    handleDragEnd,
+  } = useCategoryDrag(category);
+
+  // 分类排序放置目标
+  const {
+    isDropTarget: isReorderTarget,
+    dropPosition,
+    dropRef,
+    handleDragOver: handleReorderDragOver,
+    handleDragEnter: handleReorderDragEnter,
+    handleDragLeave: handleReorderDragLeave,
+    handleDrop: handleReorderDrop,
+  } = useCategoryReorderDrop(category, onReorder);
+
   // 处理放置
   const handleDrop_ = useCallback(async (e) => {
     e.preventDefault();
     await handleDrop(e);
   }, [handleDrop]);
+
+  // 处理排序放置
+  const handleReorderDrop_ = useCallback(async (e) => {
+    e.preventDefault();
+    await handleReorderDrop(e);
+  }, [handleReorderDrop]);
   
   // 计算子分类的合计统计
   const childStats = useMemo(() => {
@@ -66,33 +90,74 @@ function CategoryItem({ category, level = 0, onSelect, onEdit, onDelete, onAddCh
   const displayStats = hasChildren ? childStats : stats?.[category.id];
 
   return (
-    <div style={{ marginLeft: level * 12 }}>
+    <div style={{ marginLeft: level * 12, position: 'relative' }}>
+      {/* 上方放置指示器 */}
+      {isReorderTarget && dropPosition === 'before' && (
+        <div style={{
+          height: 2,
+          background: 'var(--primary)',
+          margin: '2px 10px',
+          borderRadius: 1,
+        }} />
+      )}
+      
       <div
+        ref={dropRef}
+        draggable={!isSystem}
         onMouseEnter={() => setShowActions(true)}
         onMouseLeave={() => setShowActions(false)}
         onClick={() => onSelect(category)}
-        onDragOver={handleDragOver}
-        onDragEnter={handleDragEnter}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop_}
+        onDragOver={(e) => {
+          handleDragOver(e);
+          handleReorderDragOver(e);
+        }}
+        onDragEnter={(e) => {
+          handleDragEnter(e);
+          handleReorderDragEnter(e);
+        }}
+        onDragLeave={(e) => {
+          handleDragLeave(e);
+          handleReorderDragLeave(e);
+        }}
+        onDrop={(e) => {
+          handleDrop_(e);
+          handleReorderDrop_(e);
+        }}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
         style={{
           display: 'flex',
           alignItems: 'center',
           padding: '7px 10px',
           borderRadius: 6,
-          cursor: 'pointer',
+          cursor: isSystem ? 'pointer' : 'grab',
           background: isDropTarget 
             ? 'rgba(34, 197, 94, 0.2)' 
             : isSelected 
               ? 'rgba(96, 165, 250, 0.15)' 
               : 'transparent',
           marginBottom: 2,
-          transition: 'background 0.15s, transform 0.15s',
+          transition: 'background 0.15s, transform 0.15s, opacity 0.15s',
           gap: 6,
           transform: isDropTarget ? 'scale(1.02)' : 'scale(1)',
           outline: isDropTarget ? '2px solid var(--success)' : 'none',
+          opacity: isDragging ? 0.5 : 1,
         }}
       >
+        {/* 拖拽手柄（非系统分类） */}
+        {!isSystem && showActions && (
+          <DragIcon 
+            width="12" 
+            height="12" 
+            style={{ 
+              opacity: 0.4, 
+              cursor: 'grab', 
+              flexShrink: 0,
+              marginRight: -2,
+            }} 
+          />
+        )}
+
         {/* 展开/收起按钮 */}
         {hasChildren ? (
           <button
@@ -235,6 +300,16 @@ function CategoryItem({ category, level = 0, onSelect, onEdit, onDelete, onAddCh
         </AnimatePresence>
       </div>
 
+      {/* 下方放置指示器 */}
+      {isReorderTarget && dropPosition === 'after' && (
+        <div style={{
+          height: 2,
+          background: 'var(--primary)',
+          margin: '2px 10px',
+          borderRadius: 1,
+        }} />
+      )}
+
       {/* 子分类 */}
       <AnimatePresence>
         {hasChildren && isExpanded && (
@@ -253,6 +328,7 @@ function CategoryItem({ category, level = 0, onSelect, onEdit, onDelete, onAddCh
                 onDelete={onDelete}
                 onAddChild={onAddChild}
                 stats={stats}
+                onReorder={onReorder}
               />
             ))}
           </motion.div>
@@ -265,7 +341,7 @@ function CategoryItem({ category, level = 0, onSelect, onEdit, onDelete, onAddCh
 /**
  * 左侧分类管理组件
  */
-export default function WatchlistSidebar() {
+export default function WatchlistSidebar({ onReorderCategories }) {
   // 使用 Context 中的共享数据，避免重复请求
   const { user, categories, fetchCategories, setSelectedCategory, allStocks, realtimeDataMap } = useWatchlist();
   const toast = useToast();
@@ -438,6 +514,7 @@ export default function WatchlistSidebar() {
             onDelete={handleDelete}
             onAddChild={handleAddChild}
             stats={categoryStatsMap}
+            onReorder={onReorderCategories}
           />
         ))}
 

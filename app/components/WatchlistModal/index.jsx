@@ -209,6 +209,67 @@ export default function WatchlistModal({ isOpen, onClose, user }) {
     }
   }, [user?.id, fetchCategories, fetchStocks]);
 
+  // 分类排序
+  const handleReorderCategories = useCallback(async (draggedCategory, targetCategory, position) => {
+    if (!user?.id) return;
+    
+    try {
+      // 获取扁平化的分类列表
+      const flatCategories = await fetch(`/api/watchlist-categories?user_id=${user.id}&flat=true`);
+      const data = await flatCategories.json();
+      const allCategories = data.categories || [];
+      
+      // 筛选同级别的分类
+      const sameParentId = draggedCategory.parent_id || '';
+      const sameLevelCategories = allCategories
+        .filter(c => (c.parent_id || '') === sameParentId)
+        .sort((a, b) => (parseInt(a.sort_order) || 0) - (parseInt(b.sort_order) || 0));
+      
+      // 找到被拖拽分类和目标分类的索引
+      const draggedIndex = sameLevelCategories.findIndex(c => c.id === draggedCategory.id);
+      const targetIndex = sameLevelCategories.findIndex(c => c.id === targetCategory.id);
+      
+      if (draggedIndex === -1 || targetIndex === -1) return;
+      
+      // 移除被拖拽的分类
+      const [removed] = sameLevelCategories.splice(draggedIndex, 1);
+      
+      // 计算新位置
+      let newIndex = targetIndex;
+      if (draggedIndex < targetIndex) {
+        newIndex = position === 'before' ? targetIndex - 1 : targetIndex;
+      } else {
+        newIndex = position === 'before' ? targetIndex : targetIndex + 1;
+      }
+      
+      // 插入到新位置
+      sameLevelCategories.splice(newIndex, 0, removed);
+      
+      // 批量更新排序
+      const updates = sameLevelCategories.map((cat, index) => ({
+        id: cat.id,
+        sort_order: index,
+      }));
+      
+      // 调用 API 批量更新
+      const res = await fetch('/api/watchlist-categories', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: user.id,
+          updates,
+        }),
+      });
+      
+      if (res.ok) {
+        // 刷新分类列表
+        fetchCategories();
+      }
+    } catch (error) {
+      console.error('分类排序失败:', error);
+    }
+  }, [user?.id, fetchCategories]);
+
   // Context 值
   const contextValue = useMemo(() => ({
     user,
@@ -296,14 +357,14 @@ export default function WatchlistModal({ isOpen, onClose, user }) {
           </div>
 
           {/* 主体内容 */}
-          <DragDropProvider onMoveStock={handleMoveStock}>
+          <DragDropProvider onMoveStock={handleMoveStock} onReorderCategories={handleReorderCategories}>
             <div style={{
               display: 'flex',
               flex: 1,
               overflow: 'hidden',
             }}>
               {/* 左侧分类管理 */}
-              <WatchlistSidebar />
+              <WatchlistSidebar onReorderCategories={handleReorderCategories} />
 
               {/* 右侧股票列表 */}
               <WatchlistContent />

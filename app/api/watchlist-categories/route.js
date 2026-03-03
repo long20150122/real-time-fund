@@ -134,13 +134,27 @@ export async function POST(request) {
 
 /**
  * PUT /api/watchlist-categories
- * 更新分类
+ * 更新分类（支持单个更新和批量更新排序）
  */
 export async function PUT(request) {
   try {
     const body = await request.json();
-    const { id, user_id, name, sort_order } = body;
+    const { id, user_id, name, sort_order, updates } = body;
 
+    // 批量更新排序
+    if (updates && Array.isArray(updates)) {
+      const results = updates.map(item => {
+        const category = find('watchlist_categories', cat => cat.id === item.id && cat.user_id === user_id);
+        if (category) {
+          return update('watchlist_categories', item.id, { sort_order: item.sort_order });
+        }
+        return null;
+      }).filter(Boolean);
+
+      return NextResponse.json({ success: true, updated: results.length });
+    }
+
+    // 单个更新
     if (!id || !user_id) {
       return NextResponse.json({ error: '缺少必要参数' }, { status: 400 });
     }
@@ -156,11 +170,11 @@ export async function PUT(request) {
       return NextResponse.json({ error: '系统分类不允许修改名称' }, { status: 400 });
     }
 
-    const updates = {};
-    if (name) updates.name = name;
-    if (sort_order !== undefined) updates.sort_order = sort_order;
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (sort_order !== undefined) updateData.sort_order = sort_order;
 
-    const updated = update('watchlist_categories', id, updates);
+    const updated = update('watchlist_categories', id, updateData);
 
     return NextResponse.json({ category: updated });
   } catch (error) {
